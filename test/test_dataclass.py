@@ -2,9 +2,9 @@
 
 import unittest
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import InitVar, asdict, dataclass, field
 from enum import Enum
-from typing import Dict, Optional
+from typing import ClassVar, Dict, Optional
 
 import orjson
 
@@ -12,6 +12,16 @@ import orjson
 class AnEnum(Enum):
     ONE = 1
     TWO = 2
+
+
+@dataclass
+class EmptyDataclass:
+    pass
+
+
+@dataclass
+class EmptyDataclassSlots:
+    __slots__ = ()
 
 
 @dataclass
@@ -51,9 +61,12 @@ class Datasubclass(Dataclass1):
 
 @dataclass
 class Slotsdataclass:
-    __slots__ = ("a", "b")
+    __slots__ = ("a", "b", "_c", "d")
     a: str
     b: int
+    _c: str
+    d: InitVar[str]
+    cls_var: ClassVar[str] = "cls"
 
 
 @dataclass
@@ -70,6 +83,18 @@ class UnsortedDataclass:
     d: Optional[Dict]
 
 
+@dataclass
+class InitDataclass:
+    a: InitVar[str]
+    b: InitVar[str]
+    cls_var: ClassVar[str] = "cls"
+    ab: str = ""
+
+    def __post_init__(self, a: str, b: str):
+        self._other = 1
+        self.ab = f"{a} {b}"
+
+
 class DataclassTests(unittest.TestCase):
     def test_dataclass(self):
         """
@@ -77,7 +102,8 @@ class DataclassTests(unittest.TestCase):
         """
         obj = Dataclass1("a", 1, None)
         self.assertEqual(
-            orjson.dumps(obj), b'{"name":"a","number":1,"sub":null}',
+            orjson.dumps(obj),
+            b'{"name":"a","number":1,"sub":null}',
         )
 
     def test_dataclass_recursive(self):
@@ -99,6 +125,24 @@ class DataclassTests(unittest.TestCase):
         obj1.sub = obj2
         with self.assertRaises(orjson.JSONEncodeError):
             orjson.dumps(obj1)
+
+    def test_dataclass_empty(self):
+        """
+        dumps() no attributes
+        """
+        self.assertEqual(
+            orjson.dumps(EmptyDataclass()),
+            b"{}",
+        )
+
+    def test_dataclass_empty_slots(self):
+        """
+        dumps() no attributes slots
+        """
+        self.assertEqual(
+            orjson.dumps(EmptyDataclassSlots()),
+            b"{}",
+        )
 
     def test_dataclass_default_arg(self):
         """
@@ -123,7 +167,8 @@ class DataclassTests(unittest.TestCase):
         """
         obj = Dataclass4("a", 1, 2.1)
         self.assertEqual(
-            orjson.dumps(obj), b'{"a":"a","b":1,"c":2.1}',
+            orjson.dumps(obj),
+            b'{"a":"a","b":1,"c":2.1}',
         )
 
     def test_dataclass_classvar(self):
@@ -132,7 +177,8 @@ class DataclassTests(unittest.TestCase):
         """
         obj = Dataclass4("a", 1)
         self.assertEqual(
-            orjson.dumps(obj), b'{"a":"a","b":1,"c":1.1}',
+            orjson.dumps(obj),
+            b'{"a":"a","b":1,"c":1.1}',
         )
 
     def test_dataclass_subclass(self):
@@ -141,14 +187,15 @@ class DataclassTests(unittest.TestCase):
         """
         obj = Datasubclass("a", 1, None, False)
         self.assertEqual(
-            orjson.dumps(obj), b'{"name":"a","number":1,"sub":null,"additional":false}',
+            orjson.dumps(obj),
+            b'{"name":"a","number":1,"sub":null,"additional":false}',
         )
 
     def test_dataclass_slots(self):
         """
-        dumps() dataclass with __slots__
+        dumps() dataclass with __slots__ does not include under attributes, InitVar, or ClassVar
         """
-        obj = Slotsdataclass("a", 1)
+        obj = Slotsdataclass("a", 1, "c", "d")
         assert "__dict__" not in dir(obj)
         self.assertEqual(orjson.dumps(obj), b'{"a":"a","b":1}')
 
@@ -191,12 +238,56 @@ class DataclassTests(unittest.TestCase):
             b'{"c":1,"b":2,"a":3,"d":{"e":1,"f":2}}',
         )
 
+    def test_dataclass_under(self):
+        """
+        dumps() does not include under attributes, InitVar, or ClassVar
+        """
+        obj = InitDataclass("zxc", "vbn")
+        self.assertEqual(
+            orjson.dumps(obj),
+            b'{"ab":"zxc vbn"}',
+        )
+
     def test_dataclass_option(self):
         """
-        dumps() accepts deprecated OPT_SERIALIZE_DATACALSS
+        dumps() accepts deprecated OPT_SERIALIZE_DATACLASS
         """
         obj = Dataclass1("a", 1, None)
         self.assertEqual(
             orjson.dumps(obj, option=orjson.OPT_SERIALIZE_DATACLASS),
             b'{"name":"a","number":1,"sub":null}',
+        )
+
+
+class DataclassPassthroughTests(unittest.TestCase):
+    def test_dataclass_passthrough_raise(self):
+        """
+        dumps() dataclass passes to default with OPT_PASSTHROUGH_DATACLASS
+        """
+        obj = Dataclass1("a", 1, None)
+        with self.assertRaises(orjson.JSONEncodeError):
+            orjson.dumps(obj, option=orjson.OPT_PASSTHROUGH_DATACLASS)
+        with self.assertRaises(orjson.JSONEncodeError):
+            orjson.dumps(
+                InitDataclass("zxc", "vbn"), option=orjson.OPT_PASSTHROUGH_DATACLASS
+            )
+
+    def test_dataclass_passthrough_default(self):
+        """
+        dumps() dataclass passes to default with OPT_PASSTHROUGH_DATACLASS
+        """
+        obj = Dataclass1("a", 1, None)
+        self.assertEqual(
+            orjson.dumps(obj, option=orjson.OPT_PASSTHROUGH_DATACLASS, default=asdict),
+            b'{"name":"a","number":1,"sub":null}',
+        )
+
+        def default(obj):
+            if isinstance(obj, Dataclass1):
+                return {"name": obj.name, "number": obj.number}
+            raise TypeError
+
+        self.assertEqual(
+            orjson.dumps(obj, option=orjson.OPT_PASSTHROUGH_DATACLASS, default=default),
+            b'{"name":"a","number":1}',
         )

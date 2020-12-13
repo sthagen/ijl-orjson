@@ -1,5 +1,162 @@
 # Changelog
 
+## 3.4.6 - 2020-12-07
+
+### Fixed
+
+- Fix compatibility with debug builds of CPython.
+
+## 3.4.5 - 2020-12-02
+
+### Fixed
+
+- Fix deserializing long strings on processors without AVX2.
+
+## 3.4.4 - 2020-11-25
+
+### Changed
+
+- `orjson.dumps()` serializes integers up to a 64-bit unsigned integer's
+maximum. It was previously the maximum of a 64-bit signed integer.
+
+## 3.4.3 - 2020-10-30
+
+### Fixed
+
+- Fix regression in parsing similar `dict` keys.
+
+## 3.4.2 - 2020-10-29
+
+### Changed
+
+- Improve deserialization performance.
+- Publish Windows python3.9 wheel.
+- Disable unsupported SIMD features on non-x86, non-ARM targets
+
+## 3.4.1 - 2020-10-20
+
+### Fixed
+
+- Fix `orjson.dumps.__module__` and `orjson.loads.__module__` not being the
+`str` "orjson".
+
+### Changed
+
+- Publish macos python3.9 wheel.
+- More packaging documentation.
+
+## 3.4.0 - 2020-09-25
+
+### Added
+
+- Serialize `numpy.uint8` and `numpy.int8` instances.
+
+### Fixed
+
+- Fix serializing `numpy.empty()` instances.
+
+### Changed
+
+- No longer publish `manylinux1` wheels due to tooling dropping support.
+
+## 3.3.1 - 2020-08-17
+
+### Fixed
+
+- Fix failure to deserialize some latin1 strings on some platforms. This
+was introduced in 3.2.0.
+- Fix annotation of optional parameters on `orjson.dumps()` for `help()`.
+
+### Changed
+
+- Publish `manylinux2014` wheels for amd64 in addition to `manylinux1`.
+
+## 3.3.0 - 2020-07-24
+
+### Added
+
+- `orjson.dumps()` now serializes individual numpy floats and integers, e.g.,
+`numpy.float64(1.0)`.
+- `orjson.OPT_PASSTHROUGH_DATACLASS` causes `orjson.dumps()` to pass
+`dataclasses.dataclass` instances to `default`.
+
+## 3.2.2 - 2020-07-13
+
+### Fixed
+
+- Fix serializing `dataclasses.dataclass` that have no attributes.
+
+### Changed
+
+- Improve deserialization performance of `str`.
+
+## 3.2.1 - 2020-07-03
+
+### Fixed
+
+- Fix `orjson.dumps(..., **{})` raising `TypeError` on python3.6.
+
+## 3.2.0 - 2020-06-30
+
+### Added
+
+- `orjson.OPT_APPEND_NEWLINE` appends a newline to output.
+
+### Changed
+
+- Improve deserialization performance of `str`.
+
+## 3.1.2 - 2020-06-23
+
+### Fixed
+
+- Fix serializing zero-dimension `numpy.ndarray`.
+
+## 3.1.1 - 2020-06-20
+
+### Fixed
+
+- Fix repeated serialization of `str` that are ASCII-only and have a legacy
+(non-compact) layout.
+
+## 3.1.0 - 2020-06-08
+
+### Added
+
+- `orjson.OPT_PASSTHROUGH_SUBCLASS` causes `orjson.dumps()` to pass
+subclasses of builtin types to `default` so the caller can customize the
+output.
+- `orjson.OPT_PASSTHROUGH_DATETIME` causes `orjson.dumps()` to pass
+`datetime` objects to `default` so the caller can customize the
+output.
+
+## 3.0.2 - 2020-05-27
+
+### Changed
+
+- `orjson.dumps()` does not serialize `dataclasses.dataclass` attributes
+that begin with a leading underscore, e.g., `_attr`. This is because of the
+Python idiom that a leading underscores marks an attribute as "private."
+- `orjson.dumps()` does not serialize `dataclasses.dataclass` attributes that
+are `InitVar` or `ClassVar` whether using `__slots__` or not.
+
+## 3.0.1 - 2020-05-19
+
+### Fixed
+
+- `orjson.dumps()` raises an exception if the object to be serialized
+is not given as a positional argument. `orjson.dumps({})` is intended and ok
+while `orjson.dumps(obj={})` is an error. This makes it consistent with the
+documentation, `help()` annotation, and type annotation.
+- Fix orphan reference in exception creation that leaks memory until the
+garbage collector runs.
+
+### Changed
+
+- Improve serialization performance marginally by using the fastcall/vectorcall
+calling convention on python3.7 and above.
+- Reduce build time.
+
 ## 3.0.0 - 2020-05-01
 
 ### Added

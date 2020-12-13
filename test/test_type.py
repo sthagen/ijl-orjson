@@ -2,6 +2,13 @@
 
 import unittest
 
+import pytest
+
+try:
+    import xxhash
+except ImportError:
+    xxhash = None
+
 import orjson
 
 
@@ -27,6 +34,26 @@ class TypeTests(unittest.TestCase):
         for (obj, ref) in (("blah", b'"blah"'), ("東京", b'"\xe6\x9d\xb1\xe4\xba\xac"')):
             self.assertEqual(orjson.dumps(obj), ref)
             self.assertEqual(orjson.loads(ref), obj)
+
+    def test_str_latin1(self):
+        """
+        str latin1
+        """
+        self.assertEqual(orjson.loads(orjson.dumps("üýþÿ")), "üýþÿ")
+
+    def test_str_long(self):
+        """
+        str long
+        """
+        for obj in ("aaaa" * 1024, "üýþÿ" * 1024, "好" * 1024, "�" * 1024):
+            self.assertEqual(orjson.loads(orjson.dumps(obj)), obj)
+
+    def test_str_very_long(self):
+        """
+        str long enough to trigger overflow in bytecount
+        """
+        for obj in ("aaaa" * 20000, "üýþÿ" * 20000, "好" * 20000, "�" * 20000):
+            self.assertEqual(orjson.loads(orjson.dumps(obj)), obj)
 
     def test_str_replacement(self):
         """
@@ -57,6 +84,17 @@ class TypeTests(unittest.TestCase):
         self.assertRaises(
             orjson.JSONEncodeError, orjson.dumps, b"\xed\xa0\xbd\xed\xba\x80"
         )  # \ud83d\ude80
+
+    @pytest.mark.skipif(
+        xxhash is None, reason="xxhash install broken on win, python3.9, Azure"
+    )
+    def test_str_ascii(self):
+        """
+        str is ASCII but not compact
+        """
+        digest = xxhash.xxh32_hexdigest("12345")
+        for _ in range(2):
+            self.assertEqual(orjson.dumps(digest), b'"b30d56b4"')
 
     def test_bytes_dumps(self):
         """
@@ -184,13 +222,19 @@ class TypeTests(unittest.TestCase):
             self.assertEqual(orjson.loads(str(val)), val)
             self.assertEqual(orjson.dumps(val), str(val).encode("utf-8"))
 
+    def test_uint_64(self):
+        """
+        uint 64-bit
+        """
+        for val in (0, 9223372036854775808, 18446744073709551615):
+            self.assertEqual(orjson.loads(str(val)), val)
+            self.assertEqual(orjson.dumps(val), str(val).encode("utf-8"))
+
     def test_int_128(self):
         """
         int 128-bit
-
-        These are an OverflowError in ujson, but valid in stdlib json.
         """
-        for val in (9223372036854775809, -9223372036854775809):
+        for val in (18446744073709551616, -9223372036854775809):
             self.assertRaises(orjson.JSONEncodeError, orjson.dumps, val)
 
     def test_float(self):
@@ -349,3 +393,17 @@ class TypeTests(unittest.TestCase):
         """
         with self.assertRaises(orjson.JSONEncodeError):
             orjson.dumps(object())
+
+    def test_dict_similar_keys(self):
+        """
+        loads() similar keys
+
+        This was a regression in 3.4.2 caused by using
+        the implementation in wy instead of wyhash.
+        """
+        self.assertEqual(
+            orjson.loads(
+                '{"cf_status_firefox67": "---", "cf_status_firefox57": "verified"}'
+            ),
+            {"cf_status_firefox57": "verified", "cf_status_firefox67": "---"},
+        )

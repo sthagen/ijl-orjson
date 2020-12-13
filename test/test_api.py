@@ -10,6 +10,10 @@ import orjson
 SIMPLE_TYPES = (1, 1.0, -1, None, "str", True, False)
 
 
+def default(obj):
+    return str(obj)
+
+
 class ApiTests(unittest.TestCase):
     def test_loads_trailing(self):
         """
@@ -89,7 +93,7 @@ class ApiTests(unittest.TestCase):
         dumps() option out of range high
         """
         with self.assertRaises(orjson.JSONEncodeError):
-            orjson.dumps(True, option=1 << 8)
+            orjson.dumps(True, option=1 << 12)
 
     def test_opts_multiple(self):
         """
@@ -103,19 +107,88 @@ class ApiTests(unittest.TestCase):
             b'[1,"2000-01-01T02:03:04+00:00"]',
         )
 
+    def test_default_positional(self):
+        """
+        dumps() positional arg
+        """
+        with self.assertRaises(TypeError):
+            orjson.dumps(__obj={})
+        with self.assertRaises(TypeError):
+            orjson.dumps(zxc={})
+
+    def test_default_unknown_kwarg(self):
+        """
+        dumps() unknown kwarg
+        """
+        with self.assertRaises(TypeError):
+            orjson.dumps({}, zxc=default)
+
+    def test_default_empty_kwarg(self):
+        """
+        dumps() empty kwarg
+        """
+        self.assertEqual(orjson.dumps(None, **{}), b"null")
+
+    def test_default_twice(self):
+        """
+        dumps() default twice
+        """
+        with self.assertRaises(TypeError):
+            orjson.dumps({}, default, default=default)
+
+    def test_option_twice(self):
+        """
+        dumps() option twice
+        """
+        with self.assertRaises(TypeError):
+            orjson.dumps({}, None, orjson.OPT_NAIVE_UTC, option=orjson.OPT_NAIVE_UTC)
+
+    def test_option_mixed(self):
+        """
+        dumps() option one arg, one kwarg
+        """
+
+        class Custom:
+            def __str__(self):
+                return "zxc"
+
+        self.assertEqual(
+            orjson.dumps(
+                [Custom(), datetime.datetime(2000, 1, 1, 2, 3, 4)],
+                default,
+                option=orjson.OPT_NAIVE_UTC,
+            ),
+            b'["zxc","2000-01-01T02:03:04+00:00"]',
+        )
+
     def test_dumps_signature(self):
         """
         dumps() valid __text_signature__
         """
         self.assertEqual(
-            str(inspect.signature(orjson.dumps)), "(obj, /, default, option)"
+            str(inspect.signature(orjson.dumps)), "(obj, /, default=None, option=None)"
         )
+        inspect.signature(orjson.dumps).bind("str")
+        inspect.signature(orjson.dumps).bind("str", default=default, option=1)
 
     def test_loads_signature(self):
         """
         loads() valid __text_signature__
         """
         self.assertEqual(str(inspect.signature(orjson.loads)), "(obj, /)")
+        inspect.signature(orjson.loads).bind("[]")
+
+    def test_dumps_module_str(self):
+        """
+        orjson.dumps.__module__ is a str
+        """
+        self.assertEqual(orjson.dumps.__module__, "orjson")
+
+    def test_loads_module_str(self):
+        """
+        orjson.loads.__module__ is a str
+        """
+        self.assertEqual(orjson.loads.__module__, "orjson")
 
     def test_bytes_buffer(self):
         """

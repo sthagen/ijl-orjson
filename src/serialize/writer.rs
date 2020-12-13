@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: (Apache-2.0 OR MIT)
 
-use crate::bytes::PyBytesObject;
+use crate::ffi::PyBytesObject;
 use core::ptr::NonNull;
 use pyo3::ffi::*;
 use std::os::raw::c_char;
@@ -25,7 +25,7 @@ impl BytesWriter {
     #[inline]
     pub fn finish(&mut self) -> NonNull<PyObject> {
         unsafe {
-            (*self.bytes).ob_size = self.len as isize;
+            (*self.bytes.cast::<PyVarObject>()).ob_size = self.len as Py_ssize_t;
             self.resize(self.len as isize);
             NonNull::new_unchecked(self.bytes as *mut PyObject)
         }

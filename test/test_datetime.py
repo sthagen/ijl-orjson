@@ -1,17 +1,22 @@
 # SPDX-License-Identifier: (Apache-2.0 OR MIT)
 
 import datetime
+import sys
 import unittest
 
-import orjson
 import pytest
 import pytz
 from dateutil import tz
+
+import orjson
 
 try:
     import pendulum
 except ImportError:
     pendulum = None  # type: ignore
+
+if sys.version_info >= (3, 9):
+    import zoneinfo
 
 
 class DatetimeTests(unittest.TestCase):
@@ -98,6 +103,52 @@ class DatetimeTests(unittest.TestCase):
         self.assertEqual(
             orjson.dumps([datetime.datetime(2018, 6, 1, 2, 3, 4, 0, tzinfo=pytz.UTC)]),
             b'["2018-06-01T02:03:04+00:00"]',
+        )
+
+    @unittest.skipIf(
+        sys.version_info < (3, 9) or sys.platform.startswith("win"),
+        "zoneinfo not available",
+    )
+    def test_datetime_zoneinfo_positive(self):
+        self.assertEqual(
+            orjson.dumps(
+                [
+                    datetime.datetime(
+                        2018,
+                        1,
+                        1,
+                        2,
+                        3,
+                        4,
+                        0,
+                        tzinfo=zoneinfo.ZoneInfo("Asia/Shanghai"),
+                    )
+                ]
+            ),
+            b'["2018-01-01T02:03:04+08:00"]',
+        )
+
+    @unittest.skipIf(
+        sys.version_info < (3, 9) or sys.platform.startswith("win"),
+        "zoneinfo not available",
+    )
+    def test_datetime_zoneinfo_negative(self):
+        self.assertEqual(
+            orjson.dumps(
+                [
+                    datetime.datetime(
+                        2018,
+                        6,
+                        1,
+                        2,
+                        3,
+                        4,
+                        0,
+                        tzinfo=zoneinfo.ZoneInfo("America/New_York"),
+                    )
+                ]
+            ),
+            b'["2018-06-01T02:03:04-04:00"]',
         )
 
     @pytest.mark.skipif(pendulum is None, reason="pendulum install broken on win")
@@ -566,3 +617,36 @@ class TimeTests(unittest.TestCase):
         datetime.time microsecond min
         """
         self.assertEqual(orjson.dumps(datetime.time(0, 0, 0, 1)), b'"00:00:00.000001"')
+
+
+class DateclassPassthroughTests(unittest.TestCase):
+    def test_passthrough_datetime(self):
+        with self.assertRaises(orjson.JSONEncodeError):
+            orjson.dumps(
+                datetime.datetime(1970, 1, 1), option=orjson.OPT_PASSTHROUGH_DATETIME
+            )
+
+    def test_passthrough_date(self):
+        with self.assertRaises(orjson.JSONEncodeError):
+            orjson.dumps(
+                datetime.date(1970, 1, 1), option=orjson.OPT_PASSTHROUGH_DATETIME
+            )
+
+    def test_passthrough_time(self):
+        with self.assertRaises(orjson.JSONEncodeError):
+            orjson.dumps(
+                datetime.time(12, 0, 0), option=orjson.OPT_PASSTHROUGH_DATETIME
+            )
+
+    def test_passthrough_datetime_default(self):
+        def default(obj):
+            return obj.strftime("%a, %d %b %Y %H:%M:%S GMT")
+
+        self.assertEqual(
+            orjson.dumps(
+                datetime.datetime(1970, 1, 1),
+                option=orjson.OPT_PASSTHROUGH_DATETIME,
+                default=default,
+            ),
+            b'"Thu, 01 Jan 1970 00:00:00 GMT"',
+        )

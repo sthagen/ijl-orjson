@@ -1,65 +1,27 @@
 // SPDX-License-Identifier: (Apache-2.0 OR MIT)
 
-use crate::bytes::*;
+use crate::deserialize::cache::*;
 use crate::exc::*;
+use crate::ffi::*;
 use crate::typeref::*;
 use crate::unicode::*;
-use associative_cache::replacement::RoundRobinReplacement;
-use associative_cache::*;
-use once_cell::unsync::OnceCell;
-use pyo3::prelude::*;
 use serde::de::{self, DeserializeSeed, Deserializer, MapAccess, SeqAccess, Visitor};
 use smallvec::SmallVec;
 use std::borrow::Cow;
 use std::fmt;
-use std::os::raw::c_char;
-use std::os::raw::c_void;
 use std::ptr::NonNull;
 use wyhash::wyhash;
 
-#[derive(Clone)]
-pub struct CachedKey {
-    ptr: *mut c_void,
-    hash: pyo3::ffi::Py_hash_t,
-}
-
-unsafe impl Send for CachedKey {}
-unsafe impl Sync for CachedKey {}
-
-impl CachedKey {
-    fn new(ptr: *mut pyo3::ffi::PyObject, hash: pyo3::ffi::Py_hash_t) -> CachedKey {
-        CachedKey {
-            ptr: ptr as *mut c_void,
-            hash: hash,
-        }
-    }
-
-    fn get(&mut self) -> (*mut pyo3::ffi::PyObject, pyo3::ffi::Py_hash_t) {
-        let ptr = self.ptr as *mut pyo3::ffi::PyObject;
-        ffi!(Py_INCREF(ptr));
-        (ptr, self.hash)
-    }
-}
-
-impl Drop for CachedKey {
-    fn drop(&mut self) {
-        ffi!(Py_DECREF(self.ptr as *mut pyo3::ffi::PyObject));
-    }
-}
-
-pub type KeyMap =
-    AssociativeCache<u64, CachedKey, Capacity512, HashDirectMapped, RoundRobinReplacement>;
-
-pub static mut KEY_MAP: OnceCell<KeyMap> = OnceCell::new();
-
-pub fn deserialize(ptr: *mut pyo3::ffi::PyObject) -> PyResult<NonNull<pyo3::ffi::PyObject>> {
+pub fn deserialize(
+    ptr: *mut pyo3::ffi::PyObject,
+) -> std::result::Result<NonNull<pyo3::ffi::PyObject>, String> {
     let obj_type_ptr = ob_type!(ptr);
     let contents: &[u8];
     if is_type!(obj_type_ptr, STR_TYPE) {
         let mut str_size: pyo3::ffi::Py_ssize_t = 0;
         let uni = read_utf8_from_str(ptr, &mut str_size);
         if unlikely!(uni.is_null()) {
-            return Err(JSONDecodeError::py_err((INVALID_STR, "", 0)));
+            return Err(INVALID_STR.to_string());
         }
         contents = unsafe { std::slice::from_raw_parts(uni, str_size as usize) };
     } else {
@@ -72,15 +34,11 @@ pub fn deserialize(ptr: *mut pyo3::ffi::PyObject) -> PyResult<NonNull<pyo3::ffi:
             buffer = ffi!(PyByteArray_AsString(ptr)) as *const u8;
             length = ffi!(PyByteArray_Size(ptr)) as usize;
         } else {
-            return Err(JSONDecodeError::py_err((
-                "Input must be bytes, bytearray, or str",
-                "",
-                0,
-            )));
+            return Err("Input must be bytes, bytearray, or str".to_string());
         }
         contents = unsafe { std::slice::from_raw_parts(buffer, length) };
         if encoding_rs::Encoding::utf8_valid_up_to(contents) != length {
-            return Err(JSONDecodeError::py_err((INVALID_STR, "", 0)));
+            return Err(INVALID_STR.to_string());
         }
     }
 
@@ -90,12 +48,10 @@ pub fn deserialize(ptr: *mut pyo3::ffi::PyObject) -> PyResult<NonNull<pyo3::ffi:
     let seed = JsonValue {};
     match seed.deserialize(&mut deserializer) {
         Ok(obj) => {
-            deserializer
-                .end()
-                .map_err(|e| JSONDecodeError::py_err((e.to_string(), "", 0)))?;
+            deserializer.end().map_err(|e| e.to_string())?;
             Ok(obj)
         }
-        Err(e) => Err(JSONDecodeError::py_err((e.to_string(), "", 0))),
+        Err(e) => Err(e.to_string()),
     }
 }
 
@@ -163,21 +119,21 @@ impl<'de> Visitor<'de> for JsonValue {
     where
         E: de::Error,
     {
-        Ok(nonnull!(str_to_pyobject!(value.as_str())))
+        Ok(nonnull!(unicode_from_str(value.as_str())))
     }
 
     fn visit_borrowed_str<E>(self, value: &str) -> Result<Self::Value, E>
     where
         E: de::Error,
     {
-        Ok(nonnull!(str_to_pyobject!(value)))
+        Ok(nonnull!(unicode_from_str(value)))
     }
 
     fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
     where
         E: de::Error,
     {
-        Ok(nonnull!(str_to_pyobject!(value)))
+        Ok(nonnull!(unicode_from_str(value)))
     }
 
     fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
@@ -211,6 +167,7 @@ impl<'de> Visitor<'de> for JsonValue {
         while let Some(key) = map.next_key::<Cow<str>>()? {
             let pykey: *mut pyo3::ffi::PyObject;
             let pyhash: pyo3::ffi::Py_hash_t;
+            let value = map.next_value_seed(self)?;
             if likely!(key.len() <= 64) {
                 let hash = unsafe { wyhash(key.as_bytes(), HASH_SEED) };
                 {
@@ -222,19 +179,18 @@ impl<'de> Visitor<'de> for JsonValue {
                     let entry = map.entry(&hash).or_insert_with(
                         || hash,
                         || {
-                            let pyob = str_to_pyobject!(key);
-                            CachedKey::new(pyob, hash_str(pyob))
+                            let pyob = unicode_from_str(&key);
+                            hash_str(pyob);
+                            CachedKey::new(pyob)
                         },
                     );
-                    let tmp = entry.get();
-                    pykey = tmp.0;
-                    pyhash = tmp.1;
+                    pykey = entry.get();
+                    pyhash = unsafe { (*pykey.cast::<PyASCIIObject>()).hash }
                 }
             } else {
-                pykey = str_to_pyobject!(key);
+                pykey = unicode_from_str(&key);
                 pyhash = hash_str(pykey);
             }
-            let value = map.next_value_seed(self)?;
             let _ = ffi!(_PyDict_SetItem_KnownHash(
                 dict_ptr,
                 pykey,
