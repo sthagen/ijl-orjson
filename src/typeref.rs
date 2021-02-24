@@ -41,6 +41,7 @@ pub static mut FIELD_TYPE: Lazy<NonNull<PyObject>> = Lazy::new(|| unsafe { look_
 
 pub static mut BYTES_TYPE: *mut PyTypeObject = 0 as *mut PyTypeObject;
 pub static mut BYTEARRAY_TYPE: *mut PyTypeObject = 0 as *mut PyTypeObject;
+pub static mut MEMORYVIEW_TYPE: *mut PyTypeObject = 0 as *mut PyTypeObject;
 
 pub static mut INT_ATTR_STR: *mut PyObject = 0 as *mut PyObject;
 pub static mut UTCOFFSET_METHOD_STR: *mut PyObject = 0 as *mut PyObject;
@@ -78,10 +79,20 @@ pub fn init_typerefs() {
         STR_TYPE = (*EMPTY_UNICODE).ob_type;
         STR_HASH_FUNCTION = (*((*EMPTY_UNICODE).ob_type)).tp_hash;
         BYTES_TYPE = (*PyBytes_FromStringAndSize("".as_ptr() as *const c_char, 0)).ob_type;
-        BYTEARRAY_TYPE = (*PyByteArray_FromStringAndSize("".as_ptr() as *const c_char, 0)).ob_type;
+
+        {
+            let bytearray = PyByteArray_FromStringAndSize("".as_ptr() as *const c_char, 0);
+            BYTEARRAY_TYPE = (*bytearray).ob_type;
+
+            let memoryview = PyMemoryView_FromObject(bytearray);
+            MEMORYVIEW_TYPE = (*memoryview).ob_type;
+            Py_DECREF(memoryview);
+            Py_DECREF(bytearray);
+        }
+
         DICT_TYPE = (*PyDict_New()).ob_type;
-        LIST_TYPE = (*PyList_New(0 as Py_ssize_t)).ob_type;
-        TUPLE_TYPE = (*PyTuple_New(0 as Py_ssize_t)).ob_type;
+        LIST_TYPE = (*PyList_New(0)).ob_type;
+        TUPLE_TYPE = (*PyTuple_New(0)).ob_type;
         NONE_TYPE = (*NONE).ob_type;
         BOOL_TYPE = (*TRUE).ob_type;
         INT_TYPE = (*PyLong_FromLongLong(0)).ob_type;
@@ -129,15 +140,12 @@ unsafe fn look_up_json_exc() -> *mut PyObject {
 }
 
 #[cold]
-unsafe fn look_up_numpy_type(
-    numpy_module: *mut PyObject,
-    np_type: &str,
-) -> Option<NonNull<PyTypeObject>> {
+unsafe fn look_up_numpy_type(numpy_module: *mut PyObject, np_type: &str) -> *mut PyTypeObject {
     let mod_dict = PyObject_GenericGetDict(numpy_module, std::ptr::null_mut());
     let ptr = PyMapping_GetItemString(mod_dict, np_type.as_ptr() as *const c_char);
     Py_XDECREF(ptr);
     Py_XDECREF(mod_dict);
-    Some(NonNull::new_unchecked(ptr as *mut PyTypeObject))
+    ptr as *mut PyTypeObject
 }
 
 #[cold]
@@ -149,15 +157,15 @@ unsafe fn load_numpy_types() -> Option<NumpyTypes> {
     }
 
     let types = Some(NumpyTypes {
-        array: look_up_numpy_type(numpy, "ndarray\0")?.as_ptr(),
-        float32: look_up_numpy_type(numpy, "float32\0")?.as_ptr(),
-        float64: look_up_numpy_type(numpy, "float64\0")?.as_ptr(),
-        int8: look_up_numpy_type(numpy, "int8\0")?.as_ptr(),
-        int32: look_up_numpy_type(numpy, "int32\0")?.as_ptr(),
-        int64: look_up_numpy_type(numpy, "int64\0")?.as_ptr(),
-        uint32: look_up_numpy_type(numpy, "uint32\0")?.as_ptr(),
-        uint64: look_up_numpy_type(numpy, "uint64\0")?.as_ptr(),
-        uint8: look_up_numpy_type(numpy, "uint8\0")?.as_ptr(),
+        array: look_up_numpy_type(numpy, "ndarray\0"),
+        float32: look_up_numpy_type(numpy, "float32\0"),
+        float64: look_up_numpy_type(numpy, "float64\0"),
+        int8: look_up_numpy_type(numpy, "int8\0"),
+        int32: look_up_numpy_type(numpy, "int32\0"),
+        int64: look_up_numpy_type(numpy, "int64\0"),
+        uint32: look_up_numpy_type(numpy, "uint32\0"),
+        uint64: look_up_numpy_type(numpy, "uint64\0"),
+        uint8: look_up_numpy_type(numpy, "uint8\0"),
     });
     Py_XDECREF(numpy);
     types
