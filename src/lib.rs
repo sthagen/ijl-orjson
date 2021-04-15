@@ -5,6 +5,7 @@
 #![allow(unused_unsafe)]
 #![allow(clippy::missing_safety_doc)]
 #![allow(clippy::redundant_field_names)]
+#![allow(clippy::upper_case_acronyms)]
 #![allow(clippy::zero_prefixed_literal)]
 
 #[macro_use]
@@ -270,6 +271,8 @@ pub unsafe extern "C" fn dumps(
     let mut default: Option<NonNull<PyObject>> = None;
     let mut optsptr: Option<NonNull<PyObject>> = None;
 
+    let obj = PyTuple_GET_ITEM(args, 0);
+
     let num_args = PyTuple_GET_SIZE(args);
     if unlikely!(num_args == 0) {
         return raise_dumps_exception(Cow::Borrowed(
@@ -325,7 +328,7 @@ pub unsafe extern "C" fn dumps(
         }
     }
 
-    match crate::serialize::serialize(PyTuple_GET_ITEM(args, 0), default, optsbits as opt::Opt) {
+    match crate::serialize::serialize(obj, default, optsbits as opt::Opt) {
         Ok(val) => val.as_ptr(),
         Err(err) => raise_dumps_exception(Cow::Owned(err)),
     }
