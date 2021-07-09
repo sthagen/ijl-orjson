@@ -291,25 +291,29 @@ impl<'p> Serialize for PyObjectSerializer {
                 )
                 .serialize(serializer)
             }
-            ObType::NumpyArray => match NumpyArray::new(self.ptr) {
+            ObType::NumpyArray => match NumpyArray::new(self.ptr, self.opts) {
                 Ok(val) => val.serialize(serializer),
                 Err(PyArrayError::Malformed) => err!("numpy array is malformed"),
-                Err(PyArrayError::NotContiguous) | Err(PyArrayError::UnsupportedDataType) => {
-                    if self.default.is_none() {
-                        err!("numpy array is not C contiguous; use ndarray.tolist() in default")
-                    } else {
-                        DefaultSerializer::new(
-                            self.ptr,
-                            self.opts,
-                            self.default_calls,
-                            self.recursion,
-                            self.default,
-                        )
-                        .serialize(serializer)
-                    }
+                Err(PyArrayError::NotContiguous) | Err(PyArrayError::UnsupportedDataType)
+                    if self.default.is_some() =>
+                {
+                    DefaultSerializer::new(
+                        self.ptr,
+                        self.opts,
+                        self.default_calls,
+                        self.recursion,
+                        self.default,
+                    )
+                    .serialize(serializer)
+                }
+                Err(PyArrayError::NotContiguous) => {
+                    err!("numpy array is not C contiguous; use ndarray.tolist() in default")
+                }
+                Err(PyArrayError::UnsupportedDataType) => {
+                    err!("unsupported datatype in numpy array")
                 }
             },
-            ObType::NumpyScalar => NumpyScalar::new(self.ptr).serialize(serializer),
+            ObType::NumpyScalar => NumpyScalar::new(self.ptr, self.opts).serialize(serializer),
             ObType::Unknown => DefaultSerializer::new(
                 self.ptr,
                 self.opts,
