@@ -14,19 +14,13 @@ macro_rules! ob_type {
 
 macro_rules! err {
     ($msg:expr) => {
-        return Err(serde::ser::Error::custom($msg));
+        return Err(serde::ser::Error::custom($msg))
     };
 }
 
 macro_rules! unlikely {
     ($exp:expr) => {
-        std::intrinsics::unlikely($exp)
-    };
-}
-
-macro_rules! likely {
-    ($exp:expr) => {
-        std::intrinsics::likely($exp)
+        core::intrinsics::unlikely($exp)
     };
 }
 
