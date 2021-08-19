@@ -18,9 +18,17 @@ macro_rules! err {
     };
 }
 
+#[cfg(feature = "unstable-simd")]
 macro_rules! unlikely {
     ($exp:expr) => {
         core::intrinsics::unlikely($exp)
+    };
+}
+
+#[cfg(not(feature = "unstable-simd"))]
+macro_rules! unlikely {
+    ($exp:expr) => {
+        $exp
     };
 }
 
@@ -58,7 +66,7 @@ macro_rules! ffi {
     };
 }
 
-#[cfg(python39)]
+#[cfg(Py_3_9)]
 macro_rules! call_method {
     ($obj1:expr, $obj2:expr) => {
         unsafe { pyo3::ffi::PyObject_CallMethodNoArgs($obj1, $obj2) }
@@ -68,7 +76,7 @@ macro_rules! call_method {
     };
 }
 
-#[cfg(not(python39))]
+#[cfg(not(Py_3_9))]
 macro_rules! call_method {
     ($obj1:expr, $obj2:expr) => {
         unsafe {

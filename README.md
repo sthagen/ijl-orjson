@@ -32,7 +32,7 @@ support for 64-bit
 * does not provide `load()` or `dump()` functions for reading from/writing to
 file-like objects
 
-orjson supports CPython 3.6, 3.7, 3.8, 3.9, and 3.10. It distributes x86_64/amd64
+orjson supports CPython 3.7, 3.8, 3.9, and 3.10. It distributes x86_64/amd64
 and aarch64/armv8 wheels for Linux and macOS. It distributes x86_64/amd64 wheels
 for Windows. orjson does not support PyPy. Releases follow semantic
 versioning and serializing a new object type without an opt-in flag is
@@ -1162,17 +1162,18 @@ If someone implements it well.
 To package orjson requires [Rust](https://www.rust-lang.org/) and the
 [maturin](https://github.com/PyO3/maturin) build tool.
 
-This is an example for the x86_64-unknown-linux-gnu target:
+This is an example for x86_64 on the Rust nightly channel:
 
 ```sh
-RUSTFLAGS="-C target-cpu=k8" maturin build --no-sdist --release --strip
-````
+export RUSTFLAGS="-C target-cpu=k8"
+maturin build --no-sdist --release --strip --cargo-extra-args="--features=unstable-simd"
+```
 
-The explicit `RUSTFLAGS` enables SSE2 on amd64. aarch64 does not need any
-`target-feature` specified.
+To build on the stable channel, do not specify `--features=unstable-simd`.
 
-The project's own CI tests against `nightly-2021-08-04`. It is prudent to
-pin this version because Rust nightly can introduce breaking changes.
+The project's own CI tests against `nightly-2021-08-17` and stable 1.54. It
+is prudent to pin the nightly version because that channel can introduce
+breaking changes.
 
 orjson is tested for amd64 and aarch64 on Linux and amd64 on macOS and
 Windows. It may not work on 32-bit targets.
