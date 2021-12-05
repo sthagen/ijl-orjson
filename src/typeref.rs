@@ -21,10 +21,16 @@ pub struct NumpyTypes {
     pub datetime64: *mut PyTypeObject,
 }
 
+pub static mut DEFAULT: *mut PyObject = 0 as *mut PyObject;
+pub static mut OPTION: *mut PyObject = 0 as *mut PyObject;
+
 pub static mut NONE: *mut PyObject = 0 as *mut PyObject;
 pub static mut TRUE: *mut PyObject = 0 as *mut PyObject;
 pub static mut FALSE: *mut PyObject = 0 as *mut PyObject;
 
+pub static mut BYTES_TYPE: *mut PyTypeObject = 0 as *mut PyTypeObject;
+pub static mut BYTEARRAY_TYPE: *mut PyTypeObject = 0 as *mut PyTypeObject;
+pub static mut MEMORYVIEW_TYPE: *mut PyTypeObject = 0 as *mut PyTypeObject;
 pub static mut STR_TYPE: *mut PyTypeObject = 0 as *mut PyTypeObject;
 pub static mut INT_TYPE: *mut PyTypeObject = 0 as *mut PyTypeObject;
 pub static mut BOOL_TYPE: *mut PyTypeObject = 0 as *mut PyTypeObject;
@@ -38,12 +44,9 @@ pub static mut TIME_TYPE: *mut PyTypeObject = 0 as *mut PyTypeObject;
 pub static mut TUPLE_TYPE: *mut PyTypeObject = 0 as *mut PyTypeObject;
 pub static mut UUID_TYPE: *mut PyTypeObject = 0 as *mut PyTypeObject;
 pub static mut ENUM_TYPE: *mut PyTypeObject = 0 as *mut PyTypeObject;
+
 pub static mut NUMPY_TYPES: Lazy<Option<NumpyTypes>> = Lazy::new(|| unsafe { load_numpy_types() });
 pub static mut FIELD_TYPE: Lazy<NonNull<PyObject>> = Lazy::new(|| unsafe { look_up_field_type() });
-
-pub static mut BYTES_TYPE: *mut PyTypeObject = 0 as *mut PyTypeObject;
-pub static mut BYTEARRAY_TYPE: *mut PyTypeObject = 0 as *mut PyTypeObject;
-pub static mut MEMORYVIEW_TYPE: *mut PyTypeObject = 0 as *mut PyTypeObject;
 
 pub static mut INT_ATTR_STR: *mut PyObject = 0 as *mut PyObject;
 pub static mut UTCOFFSET_METHOD_STR: *mut PyObject = 0 as *mut PyObject;
@@ -59,9 +62,9 @@ pub static mut ARRAY_STRUCT_STR: *mut PyObject = 0 as *mut PyObject;
 pub static mut DTYPE_STR: *mut PyObject = 0 as *mut PyObject;
 pub static mut DESCR_STR: *mut PyObject = 0 as *mut PyObject;
 pub static mut VALUE_STR: *mut PyObject = 0 as *mut PyObject;
+
 pub static mut STR_HASH_FUNCTION: Option<hashfunc> = None;
-pub static mut DEFAULT: *mut PyObject = 0 as *mut PyObject;
-pub static mut OPTION: *mut PyObject = 0 as *mut PyObject;
+
 pub static mut HASH_BUILDER: Lazy<ahash::RandomState> = Lazy::new(|| unsafe {
     RandomState::with_seeds(
         VALUE_STR as u64,
@@ -79,6 +82,7 @@ pub static mut JsonDecodeError: *mut PyObject = 0 as *mut PyObject;
 static INIT: Once = Once::new();
 
 #[cold]
+#[cfg_attr(feature = "unstable-simd", optimize(size))]
 pub fn init_typerefs() {
     INIT.call_once(|| unsafe {
         assert!(crate::deserialize::KEY_MAP
@@ -115,6 +119,7 @@ pub fn init_typerefs() {
         TIME_TYPE = look_up_time_type();
         UUID_TYPE = look_up_uuid_type();
         ENUM_TYPE = look_up_enum_type();
+
         INT_ATTR_STR = PyUnicode_InternFromString("int\0".as_ptr() as *const c_char);
         UTCOFFSET_METHOD_STR = PyUnicode_InternFromString("utcoffset\0".as_ptr() as *const c_char);
         NORMALIZE_METHOD_STR = PyUnicode_InternFromString("normalize\0".as_ptr() as *const c_char);
@@ -126,10 +131,10 @@ pub fn init_typerefs() {
         SLOTS_STR = PyUnicode_InternFromString("__slots__\0".as_ptr() as *const c_char);
         FIELD_TYPE_STR = PyUnicode_InternFromString("_field_type\0".as_ptr() as *const c_char);
         ARRAY_STRUCT_STR =
-            pyo3::ffi::PyUnicode_InternFromString("__array_struct__\0".as_ptr() as *const c_char);
-        DTYPE_STR = pyo3::ffi::PyUnicode_InternFromString("dtype\0".as_ptr() as *const c_char);
-        DESCR_STR = pyo3::ffi::PyUnicode_InternFromString("descr\0".as_ptr() as *const c_char);
-        VALUE_STR = pyo3::ffi::PyUnicode_InternFromString("value\0".as_ptr() as *const c_char);
+            PyUnicode_InternFromString("__array_struct__\0".as_ptr() as *const c_char);
+        DTYPE_STR = PyUnicode_InternFromString("dtype\0".as_ptr() as *const c_char);
+        DESCR_STR = PyUnicode_InternFromString("descr\0".as_ptr() as *const c_char);
+        VALUE_STR = PyUnicode_InternFromString("value\0".as_ptr() as *const c_char);
         DEFAULT = PyUnicode_InternFromString("default\0".as_ptr() as *const c_char);
         OPTION = PyUnicode_InternFromString("option\0".as_ptr() as *const c_char);
         JsonEncodeError = pyo3::ffi::PyExc_TypeError;
@@ -138,6 +143,7 @@ pub fn init_typerefs() {
 }
 
 #[cold]
+#[cfg_attr(feature = "unstable-simd", optimize(size))]
 unsafe fn look_up_json_exc() -> *mut PyObject {
     let module = PyImport_ImportModule("json\0".as_ptr() as *const c_char);
     let module_dict = PyObject_GenericGetDict(module, std::ptr::null_mut());
@@ -155,6 +161,7 @@ unsafe fn look_up_json_exc() -> *mut PyObject {
 }
 
 #[cold]
+#[cfg_attr(feature = "unstable-simd", optimize(size))]
 unsafe fn look_up_numpy_type(numpy_module: *mut PyObject, np_type: &str) -> *mut PyTypeObject {
     let mod_dict = PyObject_GenericGetDict(numpy_module, std::ptr::null_mut());
     let ptr = PyMapping_GetItemString(mod_dict, np_type.as_ptr() as *const c_char);
@@ -164,6 +171,7 @@ unsafe fn look_up_numpy_type(numpy_module: *mut PyObject, np_type: &str) -> *mut
 }
 
 #[cold]
+#[cfg_attr(feature = "unstable-simd", optimize(size))]
 unsafe fn load_numpy_types() -> Option<NumpyTypes> {
     let numpy = PyImport_ImportModule("numpy\0".as_ptr() as *const c_char);
     if numpy.is_null() {
@@ -189,6 +197,7 @@ unsafe fn load_numpy_types() -> Option<NumpyTypes> {
 }
 
 #[cold]
+#[cfg_attr(feature = "unstable-simd", optimize(size))]
 unsafe fn look_up_field_type() -> NonNull<PyObject> {
     let module = PyImport_ImportModule("dataclasses\0".as_ptr() as *const c_char);
     let module_dict = PyObject_GenericGetDict(module, std::ptr::null_mut());
@@ -200,6 +209,7 @@ unsafe fn look_up_field_type() -> NonNull<PyObject> {
 }
 
 #[cold]
+#[cfg_attr(feature = "unstable-simd", optimize(size))]
 unsafe fn look_up_enum_type() -> *mut PyTypeObject {
     let module = PyImport_ImportModule("enum\0".as_ptr() as *const c_char);
     let module_dict = PyObject_GenericGetDict(module, std::ptr::null_mut());
@@ -211,6 +221,7 @@ unsafe fn look_up_enum_type() -> *mut PyTypeObject {
 }
 
 #[cold]
+#[cfg_attr(feature = "unstable-simd", optimize(size))]
 unsafe fn look_up_uuid_type() -> *mut PyTypeObject {
     let uuid_mod = PyImport_ImportModule("uuid\0".as_ptr() as *const c_char);
     let uuid_mod_dict = PyObject_GenericGetDict(uuid_mod, std::ptr::null_mut());
@@ -223,6 +234,7 @@ unsafe fn look_up_uuid_type() -> *mut PyTypeObject {
 }
 
 #[cold]
+#[cfg_attr(feature = "unstable-simd", optimize(size))]
 unsafe fn look_up_datetime_type() -> *mut PyTypeObject {
     let datetime = (PyDateTimeAPI.DateTime_FromDateAndTime)(
         1970,
@@ -241,6 +253,7 @@ unsafe fn look_up_datetime_type() -> *mut PyTypeObject {
 }
 
 #[cold]
+#[cfg_attr(feature = "unstable-simd", optimize(size))]
 unsafe fn look_up_date_type() -> *mut PyTypeObject {
     let date = (PyDateTimeAPI.Date_FromDate)(1970, 1, 1, PyDateTimeAPI.DateType);
     let ptr = (*date).ob_type;
@@ -249,6 +262,7 @@ unsafe fn look_up_date_type() -> *mut PyTypeObject {
 }
 
 #[cold]
+#[cfg_attr(feature = "unstable-simd", optimize(size))]
 unsafe fn look_up_time_type() -> *mut PyTypeObject {
     let time = (PyDateTimeAPI.Time_FromTime)(0, 0, 0, 0, NONE, PyDateTimeAPI.TimeType);
     let ptr = (*time).ob_type;
