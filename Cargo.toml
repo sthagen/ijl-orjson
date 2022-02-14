@@ -1,6 +1,6 @@
 [package]
 name = "orjson"
-version = "3.6.6"
+version = "3.6.7"
 authors = ["ijl <ijl@mailbox.org>"]
 description = "Fast, correct Python JSON library supporting dataclasses, datetimes, and numpy"
 edition = "2018"
@@ -77,6 +77,9 @@ serde = { version = "1", default_features = false }
 serde_json = { version = "^1.0.68", default_features = false, features = ["std", "float_roundtrip"] }
 simdutf8 = { version = "0.1", default_features = false, features = ["std"] }
 smallvec = { version = "^1.8", default_features = false, features = ["union", "write"] }
+
+[build-dependencies]
+pyo3-build-config = "0.15"
 
 [profile.release]
 codegen-units = 1
