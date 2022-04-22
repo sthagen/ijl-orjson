@@ -2,7 +2,7 @@ use crate::opt::*;
 use crate::serialize::datetimelike::{DateTimeBuffer, DateTimeError, DateTimeLike, Offset};
 use crate::typeref::{ARRAY_STRUCT_STR, DESCR_STR, DTYPE_STR, NUMPY_TYPES};
 use chrono::{Datelike, NaiveDate, NaiveDateTime, Timelike};
-use pyo3::ffi::*;
+use pyo3_ffi::*;
 use serde::ser::{self, Serialize, SerializeSeq, Serializer};
 use std::convert::TryInto;
 use std::fmt;
@@ -222,8 +222,8 @@ impl<'a> NumpyArray {
 impl Drop for NumpyArray {
     fn drop(&mut self) {
         if self.depth == 0 {
-            ffi!(Py_DECREF(self.array as *mut pyo3::ffi::PyObject));
-            ffi!(Py_DECREF(self.capsule as *mut pyo3::ffi::PyObject));
+            ffi!(Py_DECREF(self.array as *mut pyo3_ffi::PyObject));
+            ffi!(Py_DECREF(self.capsule as *mut pyo3_ffi::PyObject));
         }
     }
 }
@@ -442,7 +442,7 @@ impl<'p> Serialize for DataTypeBOOL {
 }
 
 pub struct NumpyScalar {
-    ptr: *mut pyo3::ffi::PyObject,
+    ptr: *mut pyo3_ffi::PyObject,
     opts: Opt,
 }
 
@@ -643,6 +643,7 @@ impl<'p> Serialize for NumpyBool {
 /// https://github.com/numpy/numpy/blob/fc8e3bbe419748ac5c6b7f3d0845e4bafa74644b/numpy/core/include/numpy/ndarraytypes.h#L268-L282.
 #[derive(Clone, Copy, Debug)]
 pub enum NumpyDatetimeUnit {
+    NaT,
     Years,
     Months,
     Weeks,
@@ -664,6 +665,7 @@ impl fmt::Display for NumpyDatetimeUnit {
     #[cfg_attr(feature = "unstable-simd", optimize(size))]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let unit = match self {
+            Self::NaT => "NaT",
             Self::Years => "years",
             Self::Months => "months",
             Self::Weeks => "weeks",
@@ -720,8 +722,11 @@ impl NumpyDatetimeUnit {
         let el0 = ffi!(PyList_GET_ITEM(descr, 0));
         ffi!(Py_DECREF(descr));
         let descr_str = ffi!(PyTuple_GET_ITEM(el0, 1));
-        let mut str_size: pyo3::ffi::Py_ssize_t = 0;
+        let mut str_size: pyo3_ffi::Py_ssize_t = 0;
         let uni = crate::unicode::read_utf8_from_str(descr_str, &mut str_size);
+        if str_size < 5 {
+            return Self::NaT;
+        }
         let fmt = str_from_slice!(uni, str_size);
         // unit descriptions are found at
         // https://github.com/numpy/numpy/blob/b235f9e701e14ed6f6f6dcba885f7986a833743f/numpy/core/src/multiarray/datetime.c#L79-L96.
