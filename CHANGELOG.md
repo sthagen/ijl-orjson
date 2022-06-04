@@ -1,6 +1,28 @@
 # Changelog
 
-## 3.6.7 - 2022-04-15
+## 3.7.1 - 2022-06-03
+
+### Fixed
+
+- Type stubs for `orjson.JSONDecodeError` now inherit from
+`json.JSONDecodeError` instead of `ValueError`
+- Null-terminate the internal buffer of `orjson.dumps()` output.
+
+## 3.7.0 - 2022-06-03
+
+### Changed
+
+- Improve deserialization performance significantly through the use of a new
+backend. PyPI wheels for manylinux_2_28 and macOS have it enabled. Packagers
+are advised to see the README.
+
+## 3.6.9 - 2022-06-01
+
+### Changed
+
+- Improve serialization and deserialization performance.
+
+## 3.6.8 - 2022-04-15
 
 ### Fixed
 

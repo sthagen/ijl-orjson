@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-set -e
+set -eou pipefail
 
 _dir="$(dirname "${BASH_SOURCE[0]}")"
 
@@ -17,4 +17,9 @@ if [[ $to_run == *"http"* ]]; then
 	set +e
 	pkill -f 'wsgi:app' # pkill not present on manylinux_2_24_x86_64
 	set -e
+fi
+
+if [[ $to_run == *"typestubs"* ]]; then
+	python "${_dir}"/typestubs.py
+	mypy "${_dir}"/typestubs.py
 fi
