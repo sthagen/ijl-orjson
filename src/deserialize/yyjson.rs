@@ -65,7 +65,7 @@ fn unsafe_yyjson_get_next(val: *mut yyjson_val) -> *mut yyjson_val {
     }
 }
 
-fn yyjson_arr_iter_next(iter: *mut yyjson_arr_iter) -> *mut yyjson_val {
+fn yyjson_arr_iter_next(iter: &mut yyjson_arr_iter) -> *mut yyjson_val {
     unsafe {
         let val = (*iter).cur;
         (*iter).cur = unsafe_yyjson_get_next(val);
@@ -74,7 +74,7 @@ fn yyjson_arr_iter_next(iter: *mut yyjson_arr_iter) -> *mut yyjson_val {
     }
 }
 
-fn yyjson_obj_iter_next(iter: *mut yyjson_obj_iter) -> *mut yyjson_val {
+fn yyjson_obj_iter_next(iter: &mut yyjson_obj_iter) -> *mut yyjson_val {
     unsafe {
         let key = (*iter).cur;
         (*iter).cur = unsafe_yyjson_get_next(key.add(1));
@@ -239,8 +239,8 @@ pub fn parse_node(elem: *mut yyjson_val) -> NonNull<pyo3_ffi::PyObject> {
         ElementType::Int64 => parse_i64(unsafe { (*elem).uni.i64_ }),
         ElementType::Double => parse_f64(unsafe { (*elem).uni.f64_ }),
         ElementType::Null => parse_none(),
-        ElementType::True => parse_bool(true),
-        ElementType::False => parse_bool(false),
+        ElementType::True => parse_true(),
+        ElementType::False => parse_false(),
         ElementType::Array => parse_yy_array(elem),
         ElementType::Object => parse_yy_object(elem),
     }
