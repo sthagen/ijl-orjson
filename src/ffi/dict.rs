@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: (Apache-2.0 OR MIT)
 
-use pyo3_ffi::{PyObject, PyDictObject, Py_ssize_t};
+use pyo3_ffi::{PyDictObject, PyObject, Py_ssize_t};
 
 #[allow(non_snake_case)]
 #[inline(always)]
