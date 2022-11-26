@@ -18,22 +18,20 @@ def numpy_default(obj):
 @pytest.mark.skipif(numpy is None, reason="numpy is not installed")
 class TestNumpy:
     def test_numpy_array_d1_uintp(self):
-        assert (
-            orjson.dumps(
-                numpy.array([0, 18446744073709551615], numpy.uintp),
-                option=orjson.OPT_SERIALIZE_NUMPY,
-            )
-            == b"[0,18446744073709551615]"
-        )
+        low = numpy.iinfo(numpy.uintp).min
+        high = numpy.iinfo(numpy.uintp).max
+        assert orjson.dumps(
+            numpy.array([low, high], numpy.uintp),
+            option=orjson.OPT_SERIALIZE_NUMPY,
+        ) == f"[{low},{high}]".encode("ascii")
 
     def test_numpy_array_d1_intp(self):
-        assert (
-            orjson.dumps(
-                numpy.array([-9223372036854775807, 9223372036854775807], numpy.intp),
-                option=orjson.OPT_SERIALIZE_NUMPY,
-            )
-            == b"[-9223372036854775807,9223372036854775807]"
-        )
+        low = numpy.iinfo(numpy.intp).min
+        high = numpy.iinfo(numpy.intp).max
+        assert orjson.dumps(
+            numpy.array([low, high], numpy.intp),
+            option=orjson.OPT_SERIALIZE_NUMPY,
+        ) == f"[{low},{high}]".encode("ascii")
 
     def test_numpy_array_d1_i64(self):
         assert (
@@ -720,3 +718,57 @@ class TestNumpy:
                 )
                 == b"[[[1,2],[3,4],[5,6],[7,8]]]"
             )
+
+
+@pytest.mark.skipif(numpy is None, reason="numpy is not installed")
+class TestNumpyEquivalence:
+    def _test(self, obj):
+        assert orjson.dumps(obj, option=orjson.OPT_SERIALIZE_NUMPY) == orjson.dumps(
+            obj.tolist()
+        )
+
+    def test_numpy_uint8(self):
+        self._test(numpy.array([0, 255], numpy.uint8))
+
+    def test_numpy_uint16(self):
+        self._test(numpy.array([0, 65535], numpy.uint16))
+
+    def test_numpy_uint32(self):
+        self._test(numpy.array([0, 4294967295], numpy.uint32))
+
+    def test_numpy_uint64(self):
+        self._test(numpy.array([0, 18446744073709551615], numpy.uint64))
+
+    def test_numpy_int8(self):
+        self._test(numpy.array([-128, 127], numpy.int8))
+
+    def test_numpy_int16(self):
+        self._test(numpy.array([-32768, 32767], numpy.int16))
+
+    def test_numpy_int32(self):
+        self._test(numpy.array([-2147483647, 2147483647], numpy.int32))
+
+    def test_numpy_int64(self):
+        self._test(
+            numpy.array([-9223372036854775807, 9223372036854775807], numpy.int64)
+        )
+
+    @pytest.mark.skip(reason="tolist() conversion results in 3.4028234663852886e38")
+    def test_numpy_float32(self):
+        self._test(
+            numpy.array(
+                [
+                    -340282346638528859811704183484516925440.0000000000000000,
+                    340282346638528859811704183484516925440.0000000000000000,
+                ],
+                numpy.float32,
+            )
+        )
+        self._test(numpy.array([-3.4028235e38, 3.4028235e38], numpy.float32))
+
+    def test_numpy_float64(self):
+        self._test(
+            numpy.array(
+                [-1.7976931348623157e308, 1.7976931348623157e308], numpy.float64
+            )
+        )
