@@ -68,8 +68,6 @@ pub static mut DTYPE_STR: *mut PyObject = 0 as *mut PyObject;
 pub static mut DESCR_STR: *mut PyObject = 0 as *mut PyObject;
 pub static mut VALUE_STR: *mut PyObject = 0 as *mut PyObject;
 
-pub static mut STR_HASH_FUNCTION: Option<hashfunc> = None;
-
 pub static mut HASH_BUILDER: Lazy<ahash::RandomState> = Lazy::new(|| unsafe {
     RandomState::with_seeds(
         VALUE_STR as u64,
@@ -85,7 +83,7 @@ pub const YYJSON_BUFFER_SIZE: usize = 1024 * 1024 * 8;
 pub static mut YYJSON_ALLOC: Lazy<crate::yyjson::yyjson_alc> = Lazy::new(|| unsafe {
     let buffer = std::alloc::alloc(std::alloc::Layout::from_size_align_unchecked(
         YYJSON_BUFFER_SIZE,
-        std::mem::align_of::<*mut ()>(),
+        64,
     ));
     let mut alloc = crate::yyjson::yyjson_alc {
         malloc: None,
@@ -121,7 +119,6 @@ pub fn init_typerefs() {
         FALSE = Py_False();
         EMPTY_UNICODE = PyUnicode_New(0, 255);
         STR_TYPE = (*EMPTY_UNICODE).ob_type;
-        STR_HASH_FUNCTION = (*((*EMPTY_UNICODE).ob_type)).tp_hash;
         BYTES_TYPE = (*PyBytes_FromStringAndSize("".as_ptr() as *const c_char, 0)).ob_type;
 
         {
