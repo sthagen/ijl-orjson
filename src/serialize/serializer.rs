@@ -21,10 +21,6 @@ use serde::ser::{Serialize, SerializeMap, Serializer};
 use std::io::Write;
 use std::ptr::NonNull;
 
-#[cfg(target_os = "windows")]
-use serde_json::{to_writer, to_writer_pretty};
-
-#[cfg(not(target_os = "windows"))]
 use crate::serialize::json::{to_writer, to_writer_pretty};
 
 pub const RECURSION_LIMIT: u8 = 255;
@@ -103,9 +99,15 @@ pub fn pyobject_to_obtype(obj: *mut pyo3_ffi::PyObject, opts: Opt) -> ObType {
     }
 }
 
-macro_rules! is_subclass {
+macro_rules! is_subclass_by_flag {
     ($ob_type:expr, $flag:ident) => {
         (((*$ob_type).tp_flags & pyo3_ffi::$flag) != 0)
+    };
+}
+
+macro_rules! is_subclass_by_type {
+    ($ob_type:expr, $type:ident) => {
+        (*($ob_type as *mut PyTypeObject)).ob_type == $type
     };
 }
 
@@ -123,22 +125,22 @@ pub fn pyobject_to_obtype_unlikely(obj: *mut pyo3_ffi::PyObject, opts: Opt) -> O
             ObType::Tuple
         } else if ob_type == UUID_TYPE {
             ObType::Uuid
-        } else if (*(ob_type as *mut PyTypeObject)).ob_type == ENUM_TYPE {
+        } else if is_subclass_by_type!(ob_type, ENUM_TYPE) {
             ObType::Enum
         } else if opts & PASSTHROUGH_SUBCLASS == 0
-            && is_subclass!(ob_type, Py_TPFLAGS_UNICODE_SUBCLASS)
+            && is_subclass_by_flag!(ob_type, Py_TPFLAGS_UNICODE_SUBCLASS)
         {
             ObType::StrSubclass
         } else if opts & PASSTHROUGH_SUBCLASS == 0
-            && is_subclass!(ob_type, Py_TPFLAGS_LONG_SUBCLASS)
+            && is_subclass_by_flag!(ob_type, Py_TPFLAGS_LONG_SUBCLASS)
         {
             ObType::Int
         } else if opts & PASSTHROUGH_SUBCLASS == 0
-            && is_subclass!(ob_type, Py_TPFLAGS_LIST_SUBCLASS)
+            && is_subclass_by_flag!(ob_type, Py_TPFLAGS_LIST_SUBCLASS)
         {
             ObType::List
         } else if opts & PASSTHROUGH_SUBCLASS == 0
-            && is_subclass!(ob_type, Py_TPFLAGS_DICT_SUBCLASS)
+            && is_subclass_by_flag!(ob_type, Py_TPFLAGS_DICT_SUBCLASS)
         {
             ObType::Dict
         } else if opts & PASSTHROUGH_DATACLASS == 0

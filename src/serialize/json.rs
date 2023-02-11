@@ -6,6 +6,12 @@ use serde::ser::{self, Impossible, Serialize};
 use serde_json::error::{Error, Result};
 use std::io;
 
+macro_rules! reserve_minimum {
+    ($writer:expr) => {
+        $writer.reserve(32);
+    };
+}
+
 pub struct Serializer<W, F = CompactFormatter> {
     writer: W,
     formatter: F,
@@ -21,7 +27,7 @@ where
     }
 }
 
-impl<'a, W> Serializer<W, PrettyFormatter>
+impl<W> Serializer<W, PrettyFormatter>
 where
     W: io::Write + WriteExt,
 {
@@ -136,9 +142,7 @@ where
 
     #[inline]
     fn serialize_f32(self, value: f32) -> Result<()> {
-        if unlikely!(value.is_infinite() == true) {
-            self.serialize_unit()
-        } else if unlikely!(value.is_nan() == true) {
+        if unlikely!(value.is_infinite() || value.is_nan()) {
             self.serialize_unit()
         } else {
             self.formatter
@@ -148,9 +152,7 @@ where
     }
     #[inline]
     fn serialize_f64(self, value: f64) -> Result<()> {
-        if unlikely!(value.is_infinite() == true) {
-            self.serialize_unit()
-        } else if unlikely!(value.is_nan() == true) {
+        if unlikely!(value.is_infinite() || value.is_nan()) {
             self.serialize_unit()
         } else {
             self.formatter
@@ -229,7 +231,7 @@ where
     fn serialize_seq(self, len: Option<usize>) -> Result<Self::SerializeSeq> {
         if len == Some(0) {
             unsafe {
-                self.writer.reserve(8);
+                reserve_minimum!(self.writer);
                 self.writer.write_reserved_fragment(b"[]").unwrap();
             }
             Ok(Compound {
@@ -286,7 +288,7 @@ where
     fn serialize_map(self, len: Option<usize>) -> Result<Self::SerializeMap> {
         if len == Some(0) {
             unsafe {
-                self.writer.reserve(8);
+                reserve_minimum!(self.writer);
                 self.writer.write_reserved_fragment(b"{}").unwrap();
             }
 
@@ -454,7 +456,7 @@ where
             .map_err(Error::io)?;
         self.state = State::Rest;
 
-        key.serialize(MapKeySerializer { ser: &mut self.ser })?;
+        key.serialize(MapKeySerializer { ser: self.ser })?;
 
         self.ser
             .formatter
@@ -714,7 +716,7 @@ pub trait Formatter {
         W: ?Sized + io::Write + WriteExt,
     {
         unsafe {
-            writer.reserve(8);
+            reserve_minimum!(writer);
             writer.write_reserved_fragment(b"null")
         }
     }
@@ -729,7 +731,7 @@ pub trait Formatter {
         } else {
             b"false" as &[u8]
         };
-        writer.reserve(10);
+        reserve_minimum!(writer);
         unsafe { writer.write_reserved_fragment(s) }
     }
 
@@ -739,7 +741,7 @@ pub trait Formatter {
         W: ?Sized + io::Write + WriteExt,
     {
         unsafe {
-            writer.reserve(10);
+            reserve_minimum!(writer);
             let len = itoap::write_to_ptr(writer.as_mut_buffer_ptr(), value);
             writer.set_written(len);
         }
@@ -752,7 +754,7 @@ pub trait Formatter {
         W: ?Sized + io::Write + WriteExt,
     {
         unsafe {
-            writer.reserve(10);
+            reserve_minimum!(writer);
             let len = itoap::write_to_ptr(writer.as_mut_buffer_ptr(), value);
             writer.set_written(len);
         }
@@ -765,7 +767,7 @@ pub trait Formatter {
         W: ?Sized + io::Write + WriteExt,
     {
         unsafe {
-            writer.reserve(10);
+            reserve_minimum!(writer);
             let len = itoap::write_to_ptr(writer.as_mut_buffer_ptr(), value);
             writer.set_written(len);
         }
@@ -778,7 +780,7 @@ pub trait Formatter {
         W: ?Sized + io::Write + WriteExt,
     {
         unsafe {
-            writer.reserve(20);
+            reserve_minimum!(writer);
             let len = itoap::write_to_ptr(writer.as_mut_buffer_ptr(), value);
             writer.set_written(len);
         }
@@ -799,7 +801,7 @@ pub trait Formatter {
         W: ?Sized + io::Write + WriteExt,
     {
         unsafe {
-            writer.reserve(10);
+            reserve_minimum!(writer);
             let len = itoap::write_to_ptr(writer.as_mut_buffer_ptr(), value);
             writer.set_written(len);
         }
@@ -812,7 +814,7 @@ pub trait Formatter {
         W: ?Sized + io::Write + WriteExt,
     {
         unsafe {
-            writer.reserve(10);
+            reserve_minimum!(writer);
             let len = itoap::write_to_ptr(writer.as_mut_buffer_ptr(), value);
             writer.set_written(len);
         }
@@ -825,7 +827,7 @@ pub trait Formatter {
         W: ?Sized + io::Write + WriteExt,
     {
         unsafe {
-            writer.reserve(10);
+            reserve_minimum!(writer);
             let len = itoap::write_to_ptr(writer.as_mut_buffer_ptr(), value);
             writer.set_written(len);
         }
@@ -838,7 +840,7 @@ pub trait Formatter {
         W: ?Sized + io::Write + WriteExt,
     {
         unsafe {
-            writer.reserve(20);
+            reserve_minimum!(writer);
             let len = itoap::write_to_ptr(writer.as_mut_buffer_ptr(), value);
             writer.set_written(len);
         }
@@ -859,7 +861,7 @@ pub trait Formatter {
         W: ?Sized + io::Write + WriteExt,
     {
         unsafe {
-            writer.reserve(24);
+            reserve_minimum!(writer);
             let len = ryu::raw::format32(value, writer.as_mut_buffer_ptr());
             writer.set_written(len);
         }
@@ -872,7 +874,7 @@ pub trait Formatter {
         W: ?Sized + io::Write + WriteExt,
     {
         unsafe {
-            writer.reserve(24);
+            reserve_minimum!(writer);
             let len = ryu::raw::format64(value, writer.as_mut_buffer_ptr());
             writer.set_written(len);
         }
@@ -950,7 +952,7 @@ pub trait Formatter {
     where
         W: ?Sized + io::Write + WriteExt,
     {
-        writer.reserve(256);
+        reserve_minimum!(writer);
         unsafe { writer.write_reserved_punctuation(b'[').unwrap() };
         Ok(())
     }
@@ -971,6 +973,7 @@ pub trait Formatter {
     {
         unsafe {
             if !first {
+                reserve_minimum!(writer);
                 writer.write_reserved_punctuation(b',').unwrap()
             }
         }
@@ -990,7 +993,7 @@ pub trait Formatter {
     where
         W: ?Sized + io::Write + WriteExt,
     {
-        writer.reserve(256);
+        reserve_minimum!(writer);
         unsafe {
             writer.write_reserved_punctuation(b'{').unwrap();
         }
@@ -1015,6 +1018,7 @@ pub trait Formatter {
     {
         if !first {
             unsafe {
+                reserve_minimum!(writer);
                 writer.write_reserved_punctuation(b',').unwrap();
             }
         }
@@ -1034,6 +1038,7 @@ pub trait Formatter {
     where
         W: ?Sized + io::Write + WriteExt,
     {
+        reserve_minimum!(writer);
         unsafe { writer.write_reserved_punctuation(b':') }
     }
 
@@ -1055,7 +1060,7 @@ pub struct PrettyFormatter {
     has_value: bool,
 }
 
-impl<'a> PrettyFormatter {
+impl PrettyFormatter {
     pub fn new() -> Self {
         PrettyFormatter {
             current_indent: 0,
@@ -1064,13 +1069,13 @@ impl<'a> PrettyFormatter {
     }
 }
 
-impl<'a> Default for PrettyFormatter {
+impl Default for PrettyFormatter {
     fn default() -> Self {
         PrettyFormatter::new()
     }
 }
 
-impl<'a> Formatter for PrettyFormatter {
+impl Formatter for PrettyFormatter {
     #[inline]
     fn begin_array<W>(&mut self, writer: &mut W) -> io::Result<()>
     where
@@ -1171,7 +1176,7 @@ impl<'a> Formatter for PrettyFormatter {
     where
         W: ?Sized + io::Write + WriteExt,
     {
-        writer.reserve(4);
+        reserve_minimum!(writer);
         unsafe { writer.write_reserved_fragment(b": ").unwrap() };
         Ok(())
     }
@@ -1194,7 +1199,7 @@ where
     let len = value.len();
 
     if len == 0 {
-        writer.reserve(256);
+        reserve_minimum!(writer);
         return unsafe { writer.write_reserved_fragment(b"\"\"") };
     }
 
@@ -1243,10 +1248,10 @@ where
         writer.write_reserved_punctuation(b'"').unwrap();
         if initial > 0 {
             writer
-                .write_reserved_fragment(&value.get_unchecked(0..initial))
+                .write_reserved_fragment(value.get_unchecked(0..initial))
                 .unwrap();
         }
-        format_escaped_str_contents(writer, formatter, &value.get_unchecked(initial..)).unwrap();
+        format_escaped_str_contents(writer, formatter, value.get_unchecked(initial..)).unwrap();
         writer.write_reserved_punctuation(b'"').unwrap();
     };
     Ok(())
@@ -1295,7 +1300,7 @@ where
         if start < idx {
             unsafe {
                 writer
-                    .write_reserved_fragment(&bytes.get_unchecked(start..idx))
+                    .write_reserved_fragment(bytes.get_unchecked(start..idx))
                     .unwrap()
             };
         }
@@ -1313,7 +1318,7 @@ where
     if start != len {
         unsafe {
             writer
-                .write_reserved_fragment(&bytes.get_unchecked(start..len))
+                .write_reserved_fragment(bytes.get_unchecked(start..len))
                 .unwrap()
         };
     }
