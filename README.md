@@ -174,6 +174,9 @@ unsupported.
 `JSONEncodeError` is a subclass of `TypeError`. This is for compatibility
 with the standard library.
 
+If the failure was caused by an exception in `default` then
+`JSONEncodeError` chains the original exception as `__cause__`.
+
 #### default
 
 To serialize a subclass or arbitrary types, specify `default` as a
@@ -1165,7 +1168,7 @@ It benefits from also having a C build environment to compile a faster
 deserialization backend. See this project's `manylinux_2_28` builds for an
 example using clang and LTO.
 
-The project's own CI tests against `nightly-2023-04-25` and stable 1.60. It
+The project's own CI tests against `nightly-2023-05-07` and stable 1.60. It
 is prudent to pin the nightly version because that channel can introduce
 breaking changes.
 
