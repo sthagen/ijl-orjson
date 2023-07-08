@@ -119,6 +119,12 @@ macro_rules! call_method {
     };
 }
 
+macro_rules! str_hash {
+    ($op:expr) => {
+        unsafe { (*$op.cast::<pyo3_ffi::PyASCIIObject>()).hash }
+    };
+}
+
 #[cfg(Py_3_10)]
 macro_rules! pydict_contains {
     ($obj1:expr, $obj2:expr) => {
@@ -136,5 +142,22 @@ macro_rules! pydict_contains {
 macro_rules! pydict_contains {
     ($obj1:expr, $obj2:expr) => {
         unsafe { pyo3_ffi::PyDict_Contains((*$obj1).tp_dict, $obj2) == 1 }
+    };
+}
+
+#[cfg(Py_3_12)]
+macro_rules! use_immortal {
+    ($op:expr) => {
+        unsafe { $op }
+    };
+}
+
+#[cfg(not(Py_3_12))]
+macro_rules! use_immortal {
+    ($op:expr) => {
+        unsafe {
+            ffi!(Py_INCREF($op));
+            $op
+        }
     };
 }

@@ -5,12 +5,13 @@ use crate::str::*;
 use crate::typeref::*;
 use std::ptr::NonNull;
 
-pub fn get_unicode_key(key_str: &str) -> (*mut pyo3_ffi::PyObject, pyo3_ffi::Py_hash_t) {
+pub fn get_unicode_key(key_str: &str) -> *mut pyo3_ffi::PyObject {
     let pykey: *mut pyo3_ffi::PyObject;
-    let pyhash: pyo3_ffi::Py_hash_t;
     if unlikely!(key_str.len() > 64) {
         pykey = unicode_from_str(key_str);
-        pyhash = hash_str(pykey);
+        hash_str(pykey);
+    } else if unlikely!(key_str.is_empty()) {
+        pykey = use_immortal!(EMPTY_UNICODE);
     } else {
         let hash = cache_hash(key_str.as_bytes());
         let map = unsafe {
@@ -27,9 +28,8 @@ pub fn get_unicode_key(key_str: &str) -> (*mut pyo3_ffi::PyObject, pyo3_ffi::Py_
             },
         );
         pykey = entry.get();
-        pyhash = unsafe { (*pykey.cast::<pyo3_ffi::PyASCIIObject>()).hash }
     }
-    (pykey, pyhash)
+    pykey
 }
 
 #[allow(dead_code)]
@@ -44,14 +44,12 @@ pub fn parse_bool(val: bool) -> NonNull<pyo3_ffi::PyObject> {
 
 #[inline(always)]
 pub fn parse_true() -> NonNull<pyo3_ffi::PyObject> {
-    ffi!(Py_INCREF(TRUE));
-    nonnull!(TRUE)
+    nonnull!(use_immortal!(TRUE))
 }
 
 #[inline(always)]
 pub fn parse_false() -> NonNull<pyo3_ffi::PyObject> {
-    ffi!(Py_INCREF(FALSE));
-    nonnull!(FALSE)
+    nonnull!(use_immortal!(FALSE))
 }
 #[inline(always)]
 pub fn parse_i64(val: i64) -> NonNull<pyo3_ffi::PyObject> {
@@ -70,6 +68,5 @@ pub fn parse_f64(val: f64) -> NonNull<pyo3_ffi::PyObject> {
 
 #[inline(always)]
 pub fn parse_none() -> NonNull<pyo3_ffi::PyObject> {
-    ffi!(Py_INCREF(NONE));
-    nonnull!(NONE)
+    nonnull!(use_immortal!(NONE))
 }
