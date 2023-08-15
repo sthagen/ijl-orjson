@@ -4,6 +4,8 @@ use crate::ffi::orjson_fragmenttype_new;
 use ahash::RandomState;
 use once_cell::race::OnceBox;
 use pyo3_ffi::*;
+use std::cell::UnsafeCell;
+use std::mem::MaybeUninit;
 use std::os::raw::c_char;
 use std::ptr::{null_mut, NonNull};
 use std::sync::Once;
@@ -88,27 +90,28 @@ pub fn ahash_init() -> Box<ahash::RandomState> {
 pub const YYJSON_BUFFER_SIZE: usize = 1024 * 1024 * 8;
 
 #[cfg(feature = "yyjson")]
-pub static mut YYJSON_ALLOC: OnceBox<crate::yyjson::yyjson_alc> = OnceBox::new();
+#[repr(align(64))]
+pub struct YYJSONBuffer(UnsafeCell<MaybeUninit<[u8; YYJSON_BUFFER_SIZE]>>);
 
 #[cfg(feature = "yyjson")]
-pub fn yyjson_init() -> Box<crate::yyjson::yyjson_alc> {
+impl YYJSONBuffer {
+    pub(crate) fn as_ptr(&self) -> *mut u8 {
+        self.0.get().cast::<u8>()
+    }
+}
+
+#[cfg(feature = "yyjson")]
+pub static mut YYJSON_ALLOC: OnceBox<YYJSONBuffer> = OnceBox::new();
+
+#[cfg(feature = "yyjson")]
+pub fn yyjson_init() -> Box<YYJSONBuffer> {
+    // Using unsafe to ensure allocation happens on the heap without going through the stack
+    // so we don't stack overflow in debug mode. Once rust-lang/rust#63291 is stable (Box::new_uninit)
+    // we can use that instead.
+    let layout = std::alloc::Layout::new::<YYJSONBuffer>();
     unsafe {
-        let buffer = std::alloc::alloc(std::alloc::Layout::from_size_align_unchecked(
-            YYJSON_BUFFER_SIZE,
-            64,
-        ));
-        let mut alloc = crate::yyjson::yyjson_alc {
-            malloc: None,
-            realloc: None,
-            free: None,
-            ctx: null_mut(),
-        };
-        crate::yyjson::yyjson_alc_pool_init(
-            &mut alloc,
-            buffer as *mut std::os::raw::c_void,
-            YYJSON_BUFFER_SIZE,
-        );
-        Box::new(alloc)
+        let buffer = std::alloc::alloc(layout);
+        Box::from_raw(buffer.cast::<YYJSONBuffer>())
     }
 }
 
@@ -126,7 +129,6 @@ pub fn init_typerefs() {
         assert!(crate::deserialize::KEY_MAP
             .set(crate::deserialize::KeyMap::default())
             .is_ok());
-        HASH_BUILDER.get_or_init(ahash_init);
         FRAGMENT_TYPE = orjson_fragmenttype_new();
         PyDateTime_IMPORT();
         NONE = Py_None();
@@ -185,6 +187,9 @@ pub fn init_typerefs() {
         JsonEncodeError = pyo3_ffi::PyExc_TypeError;
         Py_INCREF(JsonEncodeError);
         JsonDecodeError = look_up_json_exc();
+
+        // after all type lookups
+        HASH_BUILDER.get_or_init(ahash_init);
     });
 }
 
