@@ -2,13 +2,12 @@
 
 use crate::ffi::orjson_fragmenttype_new;
 use ahash::RandomState;
-use once_cell::race::OnceBox;
+use once_cell::race::{OnceBool, OnceBox};
 use pyo3_ffi::*;
 use std::cell::UnsafeCell;
 use std::mem::MaybeUninit;
 use std::os::raw::c_char;
 use std::ptr::{null_mut, NonNull};
-use std::sync::Once;
 
 pub struct NumpyTypes {
     pub array: *mut PyTypeObject,
@@ -77,6 +76,10 @@ pub static mut HASH_BUILDER: OnceBox<ahash::RandomState> = OnceBox::new();
 
 pub fn ahash_init() -> Box<ahash::RandomState> {
     unsafe {
+        debug_assert!(!VALUE_STR.is_null());
+        debug_assert!(!DICT_TYPE.is_null());
+        debug_assert!(!STR_TYPE.is_null());
+        debug_assert!(!BYTES_TYPE.is_null());
         Box::new(RandomState::with_seeds(
             VALUE_STR as u64,
             DICT_TYPE as u64,
@@ -120,12 +123,18 @@ pub static mut JsonEncodeError: *mut PyObject = null_mut();
 #[allow(non_upper_case_globals)]
 pub static mut JsonDecodeError: *mut PyObject = null_mut();
 
-static INIT: Once = Once::new();
+static INIT: OnceBool = OnceBool::new();
 
 #[cold]
 #[cfg_attr(feature = "optimize", optimize(size))]
 pub fn init_typerefs() {
-    INIT.call_once(|| unsafe {
+    INIT.get_or_init(_init_typerefs_impl);
+}
+
+#[cold]
+#[cfg_attr(feature = "optimize", optimize(size))]
+fn _init_typerefs_impl() -> bool {
+    unsafe {
         assert!(crate::deserialize::KEY_MAP
             .set(crate::deserialize::KeyMap::default())
             .is_ok());
@@ -190,7 +199,8 @@ pub fn init_typerefs() {
 
         // after all type lookups
         HASH_BUILDER.get_or_init(ahash_init);
-    });
+    };
+    true
 }
 
 #[cold]
