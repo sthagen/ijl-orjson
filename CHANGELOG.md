@@ -1,6 +1,26 @@
 # Changelog
 
 
+## 3.9.7 - 2023-09-08
+
+### Fixed
+
+- Fix crash in `orjson.loads()` due to non-reentrant handling of persistent
+buffer. This was introduced in 3.9.3.
+- Handle some FFI removals in CPython 3.13.
+
+
+## 3.9.6 - 2023-09-07
+
+### Fixed
+
+- Fix numpy reference leak on unsupported array dtype.
+- Fix numpy.datetime64 reference handling.
+
+### Changed
+
+- Minor performance improvements.
+
 ## 3.9.5 - 2023-08-16
 
 ### Fixed

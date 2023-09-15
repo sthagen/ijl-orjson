@@ -218,6 +218,7 @@ fn raise_loads_exception(err: deserialize::DeserializeError) -> *mut PyObject {
         PyTuple_SET_ITEM(args, 1, doc);
         PyTuple_SET_ITEM(args, 2, pos);
         PyErr_SetObject(typeref::JsonDecodeError, args);
+        debug_assert!(ffi!(Py_REFCNT(args)) == 2);
         Py_DECREF(args);
     };
     null_mut()
@@ -231,6 +232,7 @@ fn raise_dumps_exception_fixed(msg: &str) -> *mut PyObject {
         let err_msg =
             PyUnicode_FromStringAndSize(msg.as_ptr() as *const c_char, msg.len() as isize);
         PyErr_SetObject(typeref::JsonEncodeError, err_msg);
+        debug_assert!(ffi!(Py_REFCNT(err_msg)) == 2);
         Py_DECREF(err_msg);
     };
     null_mut()
@@ -247,6 +249,7 @@ fn raise_dumps_exception_dynamic(err: &String) -> *mut PyObject {
         let err_msg =
             PyUnicode_FromStringAndSize(err.as_ptr() as *const c_char, err.len() as isize);
         PyErr_SetObject(typeref::JsonEncodeError, err_msg);
+        debug_assert!(ffi!(Py_REFCNT(err_msg)) == 2);
         Py_DECREF(err_msg);
 
         if !cause_exc.is_null() {
@@ -272,6 +275,7 @@ fn raise_dumps_exception_dynamic(err: &String) -> *mut PyObject {
         let err_msg =
             PyUnicode_FromStringAndSize(err.as_ptr() as *const c_char, err.len() as isize);
         PyErr_SetObject(typeref::JsonEncodeError, err_msg);
+        debug_assert!(ffi!(Py_REFCNT(err_msg)) == 2);
         Py_DECREF(err_msg);
         let mut tp: *mut PyObject = null_mut();
         let mut val: *mut PyObject = null_mut();
@@ -393,21 +397,21 @@ pub unsafe extern "C" fn dumps(
 
     if !kwds.is_null() {
         for (arg, val) in crate::ffi::PyDictIter::from_pyobject(kwds) {
-            if arg == typeref::DEFAULT {
+            if arg.as_ptr() == typeref::DEFAULT {
                 if unlikely!(num_args & 2 == 2) {
                     return raise_dumps_exception_fixed(
                         "dumps() got multiple values for argument: 'default'",
                     );
                 }
-                default = Some(NonNull::new_unchecked(val));
-            } else if arg == typeref::OPTION {
+                default = Some(val);
+            } else if arg.as_ptr() == typeref::OPTION {
                 if unlikely!(num_args & 3 == 3) {
                     return raise_dumps_exception_fixed(
                         "dumps() got multiple values for argument: 'option'",
                     );
                 }
-                optsptr = Some(NonNull::new_unchecked(val));
-            } else if arg.is_null() {
+                optsptr = Some(val);
+            } else if arg.as_ptr().is_null() {
                 break;
             } else {
                 return raise_dumps_exception_fixed("dumps() got an unexpected keyword argument");

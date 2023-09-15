@@ -57,18 +57,22 @@ macro_rules! str_from_slice {
 }
 
 #[cfg(Py_3_12)]
-macro_rules! py_decref_without_destroy {
+macro_rules! reverse_pydict_incref {
     ($op:expr) => {
         unsafe {
-            (*$op).ob_refcnt.ob_refcnt -= 1;
+            if crate::ffi::_Py_IsImmortal($op) == 0 {
+                debug_assert!(ffi!(Py_REFCNT($op)) >= 2);
+                (*$op).ob_refcnt.ob_refcnt -= 1;
+            }
         }
     };
 }
 
 #[cfg(not(Py_3_12))]
-macro_rules! py_decref_without_destroy {
+macro_rules! reverse_pydict_incref {
     ($op:expr) => {
         unsafe {
+            debug_assert!(ffi!(Py_REFCNT($op)) >= 2);
             (*$op).ob_refcnt -= 1;
         }
     };
@@ -135,7 +139,14 @@ macro_rules! str_hash {
     };
 }
 
-#[cfg(Py_3_12)]
+#[cfg(Py_3_13)]
+macro_rules! pydict_contains {
+    ($obj1:expr, $obj2:expr) => {
+        unsafe { pyo3_ffi::PyDict_Contains((*$obj1).tp_dict, $obj2) == 1 }
+    };
+}
+
+#[cfg(all(Py_3_12, not(Py_3_13)))]
 macro_rules! pydict_contains {
     ($obj1:expr, $obj2:expr) => {
         unsafe {

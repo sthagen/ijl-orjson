@@ -91,22 +91,11 @@ fn read_doc_default(data: &'static str, err: &mut yyjson_read_err) -> *mut yyjso
 
 fn read_doc_with_buffer(data: &'static str, err: &mut yyjson_read_err) -> *mut yyjson_doc {
     unsafe {
-        let mut allocator = crate::yyjson::yyjson_alc {
-            malloc: None,
-            realloc: None,
-            free: None,
-            ctx: null_mut(),
-        };
-        crate::yyjson::yyjson_alc_pool_init(
-            &mut allocator,
-            YYJSON_ALLOC.get_or_init(yyjson_init).as_ptr() as *mut std::os::raw::c_void,
-            YYJSON_BUFFER_SIZE,
-        );
         yyjson_read_opts(
             data.as_ptr() as *mut c_char,
             data.len(),
             YYJSON_READ_NOFLAG,
-            std::ptr::addr_of!(allocator),
+            &YYJSON_ALLOC.get_or_init(yyjson_init).alloc,
             err,
         )
     }
@@ -175,7 +164,10 @@ fn parse_yy_object(elem: *mut yyjson_val) -> NonNull<pyo3_ffi::PyObject> {
             return nonnull!(ffi!(PyDict_New()));
         }
         let mut key = unsafe_yyjson_get_first(elem);
+        #[cfg(not(Py_3_13))]
         let dict = ffi!(_PyDict_NewPresized(len as isize));
+        #[cfg(Py_3_13)]
+        let dict = ffi!(PyDict_New());
         for _ in 0..=len - 1 {
             let val = key.add(1);
             let key_str = str_from_slice!((*key).uni.str_ as *const u8, unsafe_yyjson_get_len(key));
@@ -185,8 +177,8 @@ fn parse_yy_object(elem: *mut yyjson_val) -> NonNull<pyo3_ffi::PyObject> {
             let _ = unsafe {
                 pyo3_ffi::_PyDict_SetItem_KnownHash(dict, pykey, pyval, str_hash!(pykey))
             };
-            py_decref_without_destroy!(pykey);
-            py_decref_without_destroy!(pyval);
+            reverse_pydict_incref!(pykey);
+            reverse_pydict_incref!(pyval);
         }
         nonnull!(dict)
     }
