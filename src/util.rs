@@ -70,6 +70,22 @@ macro_rules! unlikely {
     };
 }
 
+#[allow(unused_macros)]
+#[cfg(feature = "intrinsics")]
+macro_rules! likely {
+    ($exp:expr) => {
+        std::intrinsics::likely($exp)
+    };
+}
+
+#[allow(unused_macros)]
+#[cfg(not(feature = "intrinsics"))]
+macro_rules! likely {
+    ($exp:expr) => {
+        $exp
+    };
+}
+
 macro_rules! nonnull {
     ($exp:expr) => {
         unsafe { std::ptr::NonNull::new_unchecked($exp) }
@@ -219,5 +235,17 @@ macro_rules! use_immortal {
             ffi!(Py_INCREF($op));
             $op
         }
+    };
+}
+
+macro_rules! pydict_next {
+    ($obj1:expr, $obj2:expr, $obj3:expr, $obj4:expr) => {
+        unsafe { pyo3_ffi::_PyDict_Next($obj1, $obj2, $obj3, $obj4, std::ptr::null_mut()) }
+    };
+}
+
+macro_rules! reserve_minimum {
+    ($writer:expr) => {
+        $writer.reserve(64);
     };
 }

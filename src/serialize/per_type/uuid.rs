@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: (Apache-2.0 OR MIT)
 
-use crate::typeref::*;
+use crate::typeref::INT_ATTR_STR;
 use serde::ser::{Serialize, Serializer};
 use std::io::Write;
 use std::os::raw::c_uchar;
 
 pub type UUIDBuffer = arrayvec::ArrayVec<u8, 36>;
 
+#[repr(transparent)]
 pub struct UUID {
     ptr: *mut pyo3_ffi::PyObject,
 }
@@ -15,7 +16,7 @@ impl UUID {
     pub fn new(ptr: *mut pyo3_ffi::PyObject) -> Self {
         UUID { ptr: ptr }
     }
-    #[cfg_attr(feature = "optimize", optimize(size))]
+
     pub fn write_buf(&self, buf: &mut UUIDBuffer) {
         let value: u128;
         {
@@ -51,6 +52,7 @@ impl UUID {
     }
 }
 impl Serialize for UUID {
+    #[cold]
     #[inline(never)]
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
