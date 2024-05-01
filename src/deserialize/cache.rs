@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: (Apache-2.0 OR MIT)
 
-use associative_cache::{AssociativeCache, Capacity1024, HashDirectMapped, RoundRobinReplacement};
+use associative_cache::{AssociativeCache, Capacity2048, HashDirectMapped, RoundRobinReplacement};
 use core::ffi::c_void;
 use once_cell::unsync::OnceCell;
 use std::hash::Hasher;
@@ -34,10 +34,11 @@ impl Drop for CachedKey {
 }
 
 pub type KeyMap =
-    AssociativeCache<u64, CachedKey, Capacity1024, HashDirectMapped, RoundRobinReplacement>;
+    AssociativeCache<u64, CachedKey, Capacity2048, HashDirectMapped, RoundRobinReplacement>;
 
 pub static mut KEY_MAP: OnceCell<KeyMap> = OnceCell::new();
 
+#[inline(always)]
 pub fn cache_hash(key: &[u8]) -> u64 {
     // try to omit code for >64 path in ahash
     assume!(key.len() <= 64);

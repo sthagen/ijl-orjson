@@ -42,6 +42,7 @@ impl Date {
         Date { ptr: ptr }
     }
 
+    #[inline(never)]
     pub fn write_buf(&self, buf: &mut DateTimeBuffer) {
         {
             let year = ffi!(PyDateTime_GET_YEAR(self.ptr));
@@ -66,15 +67,13 @@ impl Date {
     }
 }
 impl Serialize for Date {
-    #[cold]
-    #[inline(never)]
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
         let mut buf = DateTimeBuffer::new();
         self.write_buf(&mut buf);
-        serializer.serialize_str(str_from_slice!(buf.as_ptr(), buf.len()))
+        serializer.serialize_unit_struct(str_from_slice!(buf.as_ptr(), buf.len()))
     }
 }
 
@@ -95,6 +94,7 @@ impl Time {
         }
     }
 
+    #[inline(never)]
     pub fn write_buf(&self, buf: &mut DateTimeBuffer) -> Result<(), TimeError> {
         if unsafe { (*(self.ptr as *mut pyo3_ffi::PyDateTime_Time)).hastzinfo == 1 } {
             return Err(TimeError::HasTimezone);
@@ -116,8 +116,6 @@ impl Time {
 }
 
 impl Serialize for Time {
-    #[cold]
-    #[inline(never)]
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -126,7 +124,7 @@ impl Serialize for Time {
         if self.write_buf(&mut buf).is_err() {
             err!(SerializeError::DatetimeLibraryUnsupported)
         };
-        serializer.serialize_str(str_from_slice!(buf.as_ptr(), buf.len()))
+        serializer.serialize_unit_struct(str_from_slice!(buf.as_ptr(), buf.len()))
     }
 }
 
@@ -237,7 +235,6 @@ impl DateTimeLike for DateTime {
 }
 
 impl Serialize for DateTime {
-    #[inline(never)]
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -246,6 +243,6 @@ impl Serialize for DateTime {
         if self.write_buf(&mut buf, self.opts).is_err() {
             err!(SerializeError::DatetimeLibraryUnsupported)
         }
-        serializer.serialize_str(str_from_slice!(buf.as_ptr(), buf.len()))
+        serializer.serialize_unit_struct(str_from_slice!(buf.as_ptr(), buf.len()))
     }
 }

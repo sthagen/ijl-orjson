@@ -17,6 +17,7 @@ impl UUID {
         UUID { ptr: ptr }
     }
 
+    #[inline(never)]
     pub fn write_buf(&self, buf: &mut UUIDBuffer) {
         let value: u128;
         {
@@ -52,14 +53,13 @@ impl UUID {
     }
 }
 impl Serialize for UUID {
-    #[cold]
-    #[inline(never)]
+    #[inline(always)]
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
         let mut buf = arrayvec::ArrayVec::<u8, 36>::new();
         self.write_buf(&mut buf);
-        serializer.serialize_str(str_from_slice!(buf.as_ptr(), buf.len()))
+        serializer.serialize_unit_struct(str_from_slice!(buf.as_ptr(), buf.len()))
     }
 }

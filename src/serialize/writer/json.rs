@@ -2,6 +2,7 @@
 // This is an adaptation of `src/value/ser.rs` from serde-json.
 
 use crate::serialize::writer::formatter::{CompactFormatter, Formatter, PrettyFormatter};
+use crate::serialize::writer::str::*;
 use crate::serialize::writer::WriteExt;
 use serde::ser::{self, Impossible, Serialize};
 use serde_json::error::{Error, Result};
@@ -71,18 +72,12 @@ where
             .map_err(Error::io)
     }
 
-    #[cold]
-    fn serialize_i8(self, value: i8) -> Result<()> {
-        self.formatter
-            .write_i8(&mut self.writer, value)
-            .map_err(Error::io)
+    fn serialize_i8(self, _value: i8) -> Result<()> {
+        unreachable!();
     }
 
-    #[cold]
-    fn serialize_i16(self, value: i16) -> Result<()> {
-        self.formatter
-            .write_i16(&mut self.writer, value)
-            .map_err(Error::io)
+    fn serialize_i16(self, _value: i16) -> Result<()> {
+        unreachable!();
     }
 
     #[inline]
@@ -103,18 +98,12 @@ where
         unreachable!();
     }
 
-    #[cold]
-    fn serialize_u8(self, value: u8) -> Result<()> {
-        self.formatter
-            .write_u8(&mut self.writer, value)
-            .map_err(Error::io)
+    fn serialize_u8(self, _value: u8) -> Result<()> {
+        unreachable!();
     }
 
-    #[cold]
-    fn serialize_u16(self, value: u16) -> Result<()> {
-        self.formatter
-            .write_u16(&mut self.writer, value)
-            .map_err(Error::io)
+    fn serialize_u16(self, _value: u16) -> Result<()> {
+        unreachable!();
     }
 
     #[inline]
@@ -160,9 +149,10 @@ where
         unreachable!();
     }
 
-    #[inline]
+    #[inline(always)]
     fn serialize_str(self, value: &str) -> Result<()> {
-        format_escaped_str(&mut self.writer, value).map_err(Error::io)
+        format_escaped_str(&mut self.writer, value);
+        Ok(())
     }
 
     fn serialize_bytes(self, value: &[u8]) -> Result<()> {
@@ -178,8 +168,18 @@ where
             .map_err(Error::io)
     }
 
-    fn serialize_unit_struct(self, _name: &'static str) -> Result<()> {
-        unreachable!();
+    #[inline(always)]
+    fn serialize_unit_struct(self, name: &'static str) -> Result<()> {
+        debug_assert!(name.len() <= 36);
+        reserve_minimum!(self.writer);
+        unsafe {
+            self.writer.write_reserved_punctuation(b'"').unwrap();
+            self.writer
+                .write_reserved_fragment(name.as_bytes())
+                .unwrap();
+            self.writer.write_reserved_punctuation(b'"').unwrap();
+        }
+        Ok(())
     }
 
     fn serialize_unit_variant(
@@ -310,21 +310,21 @@ where
         self.ser
             .formatter
             .begin_array_value(&mut self.ser.writer, self.state == State::First)
-            .map_err(Error::io)?;
+            .unwrap();
         self.state = State::Rest;
         value.serialize(&mut *self.ser)?;
         self.ser
             .formatter
             .end_array_value(&mut self.ser.writer)
             .map_err(Error::io)
+            .unwrap();
+        Ok(())
     }
 
     #[inline]
     fn end(self) -> Result<()> {
-        self.ser
-            .formatter
-            .end_array(&mut self.ser.writer)
-            .map_err(Error::io)
+        self.ser.formatter.end_array(&mut self.ser.writer).unwrap();
+        Ok(())
     }
 }
 
@@ -352,7 +352,7 @@ where
         self.ser
             .formatter
             .begin_object_key(&mut self.ser.writer, self.state == State::First)
-            .map_err(Error::io)?;
+            .unwrap();
         self.state = State::Rest;
 
         key.serialize(MapKeySerializer { ser: self.ser })?;
@@ -360,7 +360,8 @@ where
         self.ser
             .formatter
             .end_object_key(&mut self.ser.writer)
-            .map_err(Error::io)
+            .unwrap();
+        Ok(())
     }
 
     #[inline]
@@ -371,20 +372,19 @@ where
         self.ser
             .formatter
             .begin_object_value(&mut self.ser.writer)
-            .map_err(Error::io)?;
+            .unwrap();
         value.serialize(&mut *self.ser)?;
         self.ser
             .formatter
             .end_object_value(&mut self.ser.writer)
-            .map_err(Error::io)
+            .unwrap();
+        Ok(())
     }
 
     #[inline]
     fn end(self) -> Result<()> {
-        self.ser
-            .formatter
-            .end_object(&mut self.ser.writer)
-            .map_err(Error::io)
+        self.ser.formatter.end_object(&mut self.ser.writer).unwrap();
+        Ok(())
     }
 }
 
@@ -408,7 +408,7 @@ where
     type SerializeStruct = Impossible<(), Error>;
     type SerializeStructVariant = Impossible<(), Error>;
 
-    #[inline]
+    #[inline(always)]
     fn serialize_str(self, value: &str) -> Result<()> {
         self.ser.serialize_str(value)
     }
@@ -565,17 +565,25 @@ where
     }
 }
 
-#[cfg(feature = "unstable-simd")]
+macro_rules! reserve_str {
+    ($writer:expr, $value:expr) => {
+        $writer.reserve($value.len() * 8 + 32);
+    };
+}
+
+#[cfg(all(
+    feature = "unstable-simd",
+    any(not(target_arch = "x86_64"), not(feature = "avx512"))
+))]
 #[inline(always)]
-fn format_escaped_str<W>(writer: &mut W, value: &str) -> io::Result<()>
+fn format_escaped_str<W>(writer: &mut W, value: &str)
 where
     W: ?Sized + io::Write + WriteExt,
 {
     unsafe {
-        let num_reserved_bytes = value.len() * 8 + 32;
-        writer.reserve(num_reserved_bytes);
+        reserve_str!(writer, value);
 
-        let written = crate::serialize::writer::escape::format_escaped_str_impl_128(
+        let written = format_escaped_str_impl_128(
             writer.as_mut_buffer_ptr(),
             value.as_bytes().as_ptr(),
             value.len(),
@@ -583,28 +591,51 @@ where
 
         writer.set_written(written);
     }
-    Ok(())
+}
+
+#[cfg(all(feature = "unstable-simd", target_arch = "x86_64", feature = "avx512"))]
+#[inline(always)]
+fn format_escaped_str<W>(writer: &mut W, value: &str)
+where
+    W: ?Sized + io::Write + WriteExt,
+{
+    unsafe {
+        reserve_str!(writer, value);
+
+        if std::is_x86_feature_detected!("avx512vl") {
+            let written = format_escaped_str_impl_512vl(
+                writer.as_mut_buffer_ptr(),
+                value.as_bytes().as_ptr(),
+                value.len(),
+            );
+            writer.set_written(written);
+        } else {
+            let written = format_escaped_str_impl_128(
+                writer.as_mut_buffer_ptr(),
+                value.as_bytes().as_ptr(),
+                value.len(),
+            );
+            writer.set_written(written);
+        };
+    }
 }
 
 #[cfg(not(feature = "unstable-simd"))]
 #[inline(always)]
-fn format_escaped_str<W>(writer: &mut W, value: &str) -> io::Result<()>
+fn format_escaped_str<W>(writer: &mut W, value: &str)
 where
     W: ?Sized + io::Write + WriteExt,
 {
     unsafe {
-        let num_reserved_bytes = value.len() * 8 + 32;
-        writer.reserve(num_reserved_bytes);
+        reserve_str!(writer, value);
 
-        let written = crate::serialize::writer::escape::format_escaped_str_scalar(
+        let written = format_escaped_str_scalar(
             writer.as_mut_buffer_ptr(),
             value.as_bytes().as_ptr(),
             value.len(),
         );
-
         writer.set_written(written);
     }
-    Ok(())
 }
 
 #[inline]
