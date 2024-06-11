@@ -23,6 +23,9 @@
 #![allow(clippy::upper_case_acronyms)]
 #![allow(clippy::zero_prefixed_literal)]
 
+#[cfg(feature = "unwind")]
+extern crate unwinding;
+
 #[macro_use]
 mod util;
 
@@ -149,10 +152,22 @@ pub unsafe extern "C" fn orjson_init_exec(mptr: *mut PyObject) -> c_int {
     0
 }
 
+#[cfg(Py_3_13)]
+#[allow(non_upper_case_globals)]
+const Py_mod_gil: c_int = 4;
+#[cfg(Py_3_13)]
+#[allow(non_upper_case_globals, dead_code, fuzzy_provenance_casts)]
+const Py_MOD_GIL_USED: *mut c_void = 0 as *mut c_void;
+#[cfg(Py_3_13)]
+#[allow(non_upper_case_globals, dead_code, fuzzy_provenance_casts)]
+const Py_MOD_GIL_NOT_USED: *mut c_void = 1 as *mut c_void;
+
 #[cfg(not(Py_3_12))]
 const PYMODULEDEF_LEN: usize = 2;
-#[cfg(Py_3_12)]
+#[cfg(all(Py_3_12, not(Py_3_13)))]
 const PYMODULEDEF_LEN: usize = 3;
+#[cfg(Py_3_13)]
+const PYMODULEDEF_LEN: usize = 4;
 
 #[allow(non_snake_case)]
 #[no_mangle]
@@ -168,6 +183,11 @@ pub unsafe extern "C" fn PyInit_orjson() -> *mut PyModuleDef {
         PyModuleDef_Slot {
             slot: Py_mod_multiple_interpreters,
             value: Py_MOD_MULTIPLE_INTERPRETERS_NOT_SUPPORTED,
+        },
+        #[cfg(Py_3_13)]
+        PyModuleDef_Slot {
+            slot: Py_mod_gil,
+            value: Py_MOD_GIL_USED,
         },
         PyModuleDef_Slot {
             slot: 0,
@@ -323,7 +343,7 @@ pub unsafe extern "C" fn dumps(
     if num_args & 3 == 3 {
         optsptr = Some(NonNull::new_unchecked(*args.offset(2)));
     }
-    if !kwnames.is_null() {
+    if unlikely!(!kwnames.is_null()) {
         for i in 0..=Py_SIZE(kwnames).saturating_sub(1) {
             let arg = PyTuple_GET_ITEM(kwnames, i as Py_ssize_t);
             if arg == typeref::DEFAULT {
@@ -347,15 +367,15 @@ pub unsafe extern "C" fn dumps(
     }
 
     let mut optsbits: i32 = 0;
-    if let Some(opts) = optsptr {
-        if opts.as_ptr() == typeref::NONE {
-        } else if (*opts.as_ptr()).ob_type != typeref::INT_TYPE {
-            return raise_dumps_exception_fixed("Invalid opts");
-        } else {
+    if unlikely!(optsptr.is_some()) {
+        let opts = optsptr.unwrap();
+        if (*opts.as_ptr()).ob_type == typeref::INT_TYPE {
             optsbits = PyLong_AsLong(optsptr.unwrap().as_ptr()) as i32;
-            if !(0..=opt::MAX_OPT).contains(&optsbits) {
+            if unlikely!(!(0..=opt::MAX_OPT).contains(&optsbits)) {
                 return raise_dumps_exception_fixed("Invalid opts");
             }
+        } else if unlikely!(opts.as_ptr() != typeref::NONE) {
+            return raise_dumps_exception_fixed("Invalid opts");
         }
     }
 
