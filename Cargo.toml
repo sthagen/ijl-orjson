@@ -1,6 +1,6 @@
 [package]
 name = "orjson"
-version = "3.10.6"
+version = "3.10.7"
 authors = ["ijl <ijl@mailbox.org>"]
 description = "Fast, correct Python JSON library supporting dataclasses, datetimes, and numpy"
 edition = "2021"
@@ -61,7 +61,7 @@ associative-cache = { version = "2", default-features = false }
 beef = { version = "0.5", default-features = false, features = ["impl_serde"] }
 bytecount = { version = "^0.6.7", default-features = false, features = ["runtime-dispatch-simd"] }
 chrono = { version = "=0.4.34", default-features = false }
-compact_str = { version = "0.7", default-features = false, features = ["serde"] }
+compact_str = { version = "0.8", default-features = false, features = ["serde"] }
 encoding_rs = { version = "0.8", default-features = false }
 half = { version = "2", default-features = false, features = ["std"] }
 itoa = { version = "1", default-features = false }
