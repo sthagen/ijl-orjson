@@ -1,7 +1,14 @@
 # Changelog
 
+## 3.10.11
 
-### 3.10.10
+### Changed
+
+- Improve performance of UUIDs.
+- Publish PyPI wheels with trusted publishing and PEP 740 attestations.
+- Include text of licenses for vendored dependencies.
+
+## 3.10.10
 
 ### Fixed
 
@@ -12,7 +19,7 @@
 - Publish aarch64 manylinux_2_17 wheel for 3.13 to PyPI.
 
 
-### 3.10.9
+## 3.10.9
 
 ### Fixed
 
@@ -20,7 +27,7 @@
 introduced in 3.10.8.
 
 
-### 3.10.8
+## 3.10.8
 
 ### Changed
 
