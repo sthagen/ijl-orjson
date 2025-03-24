@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: (Apache-2.0 OR MIT)
 
-use crate::opt::*;
+use crate::opt::{Opt, OMIT_MICROSECONDS};
 use crate::serialize::buffer::SmallFixedBuffer;
 use crate::serialize::error::SerializeError;
 use crate::serialize::per_type::datetimelike::{DateTimeError, DateTimeLike, Offset};
-#[cfg(Py_3_9)]
-use crate::typeref::ZONEINFO_TYPE;
-use crate::typeref::{CONVERT_METHOD_STR, DST_STR, NORMALIZE_METHOD_STR, UTCOFFSET_METHOD_STR};
+use crate::typeref::{
+    CONVERT_METHOD_STR, DST_STR, NORMALIZE_METHOD_STR, UTCOFFSET_METHOD_STR, ZONEINFO_TYPE,
+};
 use serde::ser::{Serialize, Serializer};
 
 macro_rules! write_double_digit {
@@ -55,13 +55,19 @@ impl Date {
         }
         buf.push(b'-');
         {
-            let month = ffi!(PyDateTime_GET_MONTH(self.ptr)) as u32;
-            write_double_digit!(buf, month);
+            let val_py = ffi!(PyDateTime_GET_MONTH(self.ptr));
+            debug_assert!(val_py >= 0);
+            #[allow(clippy::cast_sign_loss)]
+            let val = val_py as u32;
+            write_double_digit!(buf, val);
         }
         buf.push(b'-');
         {
-            let day = ffi!(PyDateTime_GET_DAY(self.ptr)) as u32;
-            write_double_digit!(buf, day);
+            let val_py = ffi!(PyDateTime_GET_DAY(self.ptr));
+            debug_assert!(val_py >= 0);
+            #[allow(clippy::cast_sign_loss)]
+            let val = val_py as u32;
+            write_double_digit!(buf, val);
         }
     }
 }
@@ -95,7 +101,7 @@ impl Time {
 
     #[inline(never)]
     pub fn write_buf(&self, buf: &mut SmallFixedBuffer) -> Result<(), TimeError> {
-        if unsafe { (*(self.ptr as *mut pyo3_ffi::PyDateTime_Time)).hastzinfo == 1 } {
+        if unsafe { (*self.ptr.cast::<pyo3_ffi::PyDateTime_Time>()).hastzinfo == 1 } {
             return Err(TimeError::HasTimezone);
         }
         let hour = ffi!(PyDateTime_TIME_GET_HOUR(self.ptr)) as u8;
@@ -122,7 +128,7 @@ impl Serialize for Time {
         let mut buf = SmallFixedBuffer::new();
         if self.write_buf(&mut buf).is_err() {
             err!(SerializeError::DatetimeLibraryUnsupported)
-        };
+        }
         serializer.serialize_unit_struct(str_from_slice!(buf.as_ptr(), buf.len()))
     }
 }
@@ -144,7 +150,11 @@ impl DateTime {
 macro_rules! pydatetime_get {
     ($fn: ident, $pyfn: ident, $ty: ident) => {
         fn $fn(&self) -> $ty {
-            ffi!($pyfn(self.ptr)) as $ty
+            let ret = ffi!($pyfn(self.ptr));
+            debug_assert!(ret >= 0);
+            #[allow(clippy::cast_sign_loss)]
+            let ret2 = ret as $ty; // stmt_expr_attributes
+            ret2
         }
     };
 }
@@ -163,9 +173,10 @@ impl DateTimeLike for DateTime {
     }
 
     fn has_tz(&self) -> bool {
-        unsafe { (*(self.ptr as *mut pyo3_ffi::PyDateTime_DateTime)).hastzinfo == 1 }
+        unsafe { (*(self.ptr.cast::<pyo3_ffi::PyDateTime_DateTime>())).hastzinfo == 1 }
     }
 
+    #[inline(never)]
     fn slow_offset(&self) -> Result<Offset, DateTimeError> {
         let tzinfo = ffi!(PyDateTime_DATE_GET_TZINFO(self.ptr));
         if ffi!(PyObject_HasAttr(tzinfo, CONVERT_METHOD_STR)) == 1 {
@@ -202,7 +213,7 @@ impl DateTimeLike for DateTime {
         }
     }
 
-    #[cfg(Py_3_9)]
+    #[inline]
     fn offset(&self) -> Result<Offset, DateTimeError> {
         if !self.has_tz() {
             Ok(Offset::default())
@@ -220,15 +231,6 @@ impl DateTimeLike for DateTime {
             } else {
                 self.slow_offset()
             }
-        }
-    }
-
-    #[cfg(not(Py_3_9))]
-    fn offset(&self) -> Result<Offset, DateTimeError> {
-        if !self.has_tz() {
-            Ok(Offset::default())
-        } else {
-            self.slow_offset()
         }
     }
 }

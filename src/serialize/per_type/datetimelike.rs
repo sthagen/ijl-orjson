@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: (Apache-2.0 OR MIT)
 
-use crate::opt::*;
+use crate::opt::{Opt, NAIVE_UTC, OMIT_MICROSECONDS, UTC_Z};
 
 use crate::serialize::buffer::SmallFixedBuffer;
 
@@ -60,7 +60,7 @@ pub trait DateTimeLike {
     /// Is the object time-zone aware?
     fn has_tz(&self) -> bool;
 
-    //// python3.8 or below implementation of offset()
+    //// Non-zoneinfo implementation of offset()
     fn slow_offset(&self) -> Result<Offset, DateTimeError>;
 
     /// The offset of the timezone.

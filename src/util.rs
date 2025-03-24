@@ -47,7 +47,7 @@ macro_rules! is_subclass_by_flag {
 macro_rules! is_subclass_by_type {
     ($ob_type:expr, $type:ident) => {
         unsafe {
-            (*($ob_type as *mut pyo3_ffi::PyTypeObject))
+            (*($ob_type.cast::<pyo3_ffi::PyTypeObject>()))
                 .ob_base
                 .ob_base
                 .ob_type
@@ -112,7 +112,7 @@ macro_rules! nonnull {
 
 macro_rules! str_from_slice {
     ($ptr:expr, $size:expr) => {
-        unsafe { std::str::from_utf8_unchecked(core::slice::from_raw_parts($ptr, $size as usize)) }
+        unsafe { core::str::from_utf8_unchecked(core::slice::from_raw_parts($ptr, $size as usize)) }
     };
 }
 
@@ -168,36 +168,12 @@ macro_rules! ffi {
     };
 }
 
-#[cfg(Py_3_9)]
 macro_rules! call_method {
     ($obj1:expr, $obj2:expr) => {
         unsafe { pyo3_ffi::PyObject_CallMethodNoArgs($obj1, $obj2) }
     };
     ($obj1:expr, $obj2:expr, $obj3:expr) => {
         unsafe { pyo3_ffi::PyObject_CallMethodOneArg($obj1, $obj2, $obj3) }
-    };
-}
-
-#[cfg(not(Py_3_9))]
-macro_rules! call_method {
-    ($obj1:expr, $obj2:expr) => {
-        unsafe {
-            pyo3_ffi::PyObject_CallMethodObjArgs(
-                $obj1,
-                $obj2,
-                core::ptr::null_mut() as *mut pyo3_ffi::PyObject,
-            )
-        }
-    };
-    ($obj1:expr, $obj2:expr, $obj3:expr) => {
-        unsafe {
-            pyo3_ffi::PyObject_CallMethodObjArgs(
-                $obj1,
-                $obj2,
-                $obj3,
-                core::ptr::null_mut() as *mut pyo3_ffi::PyObject,
-            )
-        }
     };
 }
 
@@ -278,6 +254,28 @@ macro_rules! pydict_next {
     };
 }
 
+macro_rules! pydict_setitem {
+    ($dict:expr, $pykey:expr, $pyval:expr) => {
+        debug_assert!(ffi!(Py_REFCNT($dict)) == 1);
+        debug_assert!(str_hash!($pykey) != -1);
+        #[cfg(not(Py_3_13))]
+        unsafe {
+            let _ = pyo3_ffi::_PyDict_SetItem_KnownHash($dict, $pykey, $pyval, str_hash!($pykey));
+        }
+        #[cfg(Py_3_13)]
+        unsafe {
+            let _ = pyo3_ffi::_PyDict_SetItem_KnownHash_LockHeld(
+                $dict.cast::<pyo3_ffi::PyDictObject>(),
+                $pykey,
+                $pyval,
+                str_hash!($pykey),
+            );
+        }
+        reverse_pydict_incref!($pykey);
+        reverse_pydict_incref!($pyval);
+    };
+}
+
 macro_rules! reserve_minimum {
     ($writer:expr) => {
         $writer.reserve(64);
@@ -336,4 +334,18 @@ macro_rules! unreachable_unchecked {
     () => {
         unsafe { core::hint::unreachable_unchecked() }
     };
+}
+
+#[inline(always)]
+#[allow(clippy::cast_possible_wrap)]
+pub fn usize_to_isize(val: usize) -> isize {
+    debug_assert!(val < (isize::MAX as usize));
+    val as isize
+}
+
+#[inline(always)]
+#[allow(clippy::cast_sign_loss)]
+pub fn isize_to_usize(val: isize) -> usize {
+    debug_assert!(val >= 0);
+    val as usize
 }
