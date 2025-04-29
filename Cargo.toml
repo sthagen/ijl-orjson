@@ -1,6 +1,6 @@
 [package]
 name = "orjson"
-version = "3.10.16"
+version = "3.10.17"
 authors = ["ijl <ijl@mailbox.org>"]
 description = "Fast, correct Python JSON library supporting dataclasses, datetimes, and numpy"
 edition = "2021"
@@ -30,10 +30,7 @@ crate-type = ["cdylib"]
 [features]
 default = []
 
-# Use SIMD intrinsics. This requires Rust on the nightly channel.
-unstable-simd = []
-
-# Include runtime-detected functions that use AVX512VL. Requires unstable-simd and amd64.
+# Include runtime-detected functions that use AVX512VL.
 avx512 = []
 
 # Avoid bundling libgcc on musl.
@@ -44,6 +41,7 @@ unwind = ["unwinding"]
 yyjson = []
 
 # Features detected by build.rs. Do not specify.
+generic_simd = []
 inline_int = []
 intrinsics = []
 optimize = []
@@ -64,7 +62,7 @@ serde = { version = "1", default-features = false }
 serde_json = { version = "1", default-features = false, features = ["std", "float_roundtrip"] }
 simdutf8 = { version = "0.1", default-features = false, features = ["std", "public_imp", "aarch64_neon"] }
 smallvec = { version = "^1.11", default-features = false, features = ["union", "write"] }
-unwinding = { version = "^0.2.4", default-features = false, features = ["unwinder"], optional = true }
+unwinding = { version = "=0.2.5", default-features = false, features = ["unwinder"], optional = true }
 uuid = { version = "1", default-features = false }
 xxhash-rust = { version = "^0.8", default-features = false, features = ["xxh3"] }
 
