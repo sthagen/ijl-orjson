@@ -1,6 +1,6 @@
 [package]
 name = "orjson"
-version = "3.11.0"
+version = "3.11.1"
 authors = ["ijl <ijl@mailbox.org>"]
 description = "Fast, correct Python JSON library supporting dataclasses, datetimes, and numpy"
 edition = "2021"
@@ -38,6 +38,7 @@ yyjson = []
 
 # Features detected by build.rs. Do not specify.
 avx512 = []
+c_ulong_32 = []
 generic_simd = []
 inline_int = []
 intrinsics = []
@@ -45,6 +46,7 @@ optimize = []
 
 [dependencies]
 associative-cache = { version = "2", default-features = false }
+bytes = { version = "1", default-features = false }
 bytecount = { version = "^0.6.7", default-features = false, features = ["runtime-dispatch-simd"] }
 encoding_rs = { version = "0.8", default-features = false }
 half = { version = "2", default-features = false, features = ["std"] }
