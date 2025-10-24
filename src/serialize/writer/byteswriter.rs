@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: (Apache-2.0 OR MIT)
 
+use crate::ffi::{
+    _PyBytes_Resize, PyBytes_FromStringAndSize, PyBytesObject, PyObject, PyVarObject,
+};
 use crate::util::usize_to_isize;
-use bytes::{buf::UninitSlice, BufMut};
+use bytes::{BufMut, buf::UninitSlice};
 use core::mem::MaybeUninit;
 use core::ptr::NonNull;
-use pyo3_ffi::{PyBytesObject, PyBytes_FromStringAndSize, PyObject, PyVarObject, _PyBytes_Resize};
 
 const BUFFER_LENGTH: usize = 1024;
 
@@ -144,7 +146,8 @@ impl WriteExt for &mut BytesWriter {
     #[inline(always)]
     fn reserve(&mut self, len: usize) {
         let end_length = self.len + len;
-        if unlikely!(end_length >= self.cap) {
+        if end_length >= self.cap {
+            cold_path!();
             self.grow(end_length);
         }
     }
