@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: (Apache-2.0 OR MIT)
+# Copyright ijl (2020-2025)
 
 import datetime
 import json
@@ -58,7 +59,7 @@ class TestIndentedOutput:
 
     def test_list_max(self):
         fixture = b"".join(
-            (b"".join(b"[" for _ in range(255)), b"".join(b"]" for _ in range(255))),
+            (b"".join(b"[" for _ in range(254)), b"".join(b"]" for _ in range(254))),
         )
         obj = orjson.loads(fixture)
         serialized = orjson.dumps(

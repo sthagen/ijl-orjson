@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: (Apache-2.0 OR MIT)
+// Copyright ijl (2025)
 
 #[cfg(target_endian = "little")]
 use crate::ffi::PyCompactUnicodeObject;
@@ -92,7 +93,7 @@ impl PyStr {
         }
     }
 
-    #[cfg(target_endian = "little")]
+    #[cfg(all(CPython, target_endian = "little"))]
     pub fn hash(&mut self) {
         unsafe {
             let ptr = self.ptr.as_ptr().cast::<PyASCIIObject>();
@@ -112,7 +113,7 @@ impl PyStr {
         }
     }
 
-    #[cfg(not(target_endian = "little"))]
+    #[cfg(all(CPython, not(target_endian = "little")))]
     pub fn hash(&mut self) {
         unsafe {
             let data_ptr = ffi!(PyUnicode_DATA(self.ptr.as_ptr()));

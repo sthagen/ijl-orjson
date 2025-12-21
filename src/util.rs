@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: (Apache-2.0 OR MIT)
+// Copyright ijl (2019-2025), Marc Mueller (2023)
 
 pub(crate) const INVALID_STR: &str = "str is not valid UTF-8: surrogates not allowed";
 
@@ -41,7 +42,7 @@ macro_rules! tp_flags {
         unsafe {
             (*$ob_type)
                 .tp_flags
-                .load(std::sync::atomic::Ordering::Relaxed)
+                .load(core::sync::atomic::Ordering::Relaxed)
         }
     };
 }

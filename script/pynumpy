@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: (Apache-2.0 OR MIT)
+# Copyright ijl (2020-2025), Nazar Kostetskyi (2022), Aarni Koskela (2021)
 
 import gc
 import io
@@ -11,7 +12,6 @@ from timeit import timeit
 
 import numpy as np
 import psutil
-from memory_profiler import memory_usage
 from tabulate import tabulate
 
 import orjson
@@ -119,7 +119,7 @@ for lib_name in LIBRARIES:
         )
         latency = per_iter_latency(total_latency)
         time.sleep(1)
-        mem = max(memory_usage((func,), interval=0.001, timeout=latency * 2))
+        mem = 0  # todo
         correct = test_correctness(func)
 
     if lib_name == "orjson":

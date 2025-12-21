@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: (Apache-2.0 OR MIT)
+// Copyright ijl (2025)
 // pyo3-ffi/src/impl_/mod.rs at 0.27.1
 
 mod atomic_c_ulong {
@@ -8,14 +9,14 @@ mod atomic_c_ulong {
         type Type;
     }
     impl AtomicCULongType for GetAtomicCULong<32> {
-        type Type = std::sync::atomic::AtomicU32;
+        type Type = core::sync::atomic::AtomicU32;
     }
     impl AtomicCULongType for GetAtomicCULong<64> {
-        type Type = std::sync::atomic::AtomicU64;
+        type Type = core::sync::atomic::AtomicU64;
     }
 
     pub type TYPE =
-        <GetAtomicCULong<{ std::mem::size_of::<std::ffi::c_ulong>() * 8 }> as AtomicCULongType>::Type;
+        <GetAtomicCULong<{ core::mem::size_of::<core::ffi::c_ulong>() * 8 }> as AtomicCULongType>::Type;
 }
 
 pub type AtomicCULong = atomic_c_ulong::TYPE;
