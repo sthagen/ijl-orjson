@@ -21,7 +21,7 @@ RFC 8259 ("The JavaScript Object Notation (JSON) Data Interchange Format").
 Reading from and writing to files, line-delimited JSON files, and so on is
 not provided by the library.
 
-orjson supports CPython 3.9, 3.10, 3.11, 3.12, 3.13, 3.14, and 3.15.
+orjson supports CPython 3.10, 3.11, 3.12, 3.13, 3.14, and 3.15.
 
 It distributes amd64/x86_64/x64, i686/x86, aarch64/arm64/armv8, arm7,
 ppc64le/POWER8, and s390x wheels for Linux, amd64 and aarch64 wheels
@@ -40,8 +40,8 @@ orjson may support PEP 703 free-threading when it is stable.
 Releases follow semantic versioning and serializing a new object type
 without an opt-in flag is considered a breaking change.
 
-orjson is licensed under both the Apache 2.0 and MIT licenses. The
-repository and issue tracker is
+orjson contains source code licensed under the Mozilla Public License 2.0,
+Apache 2.0, and MIT licenses. The repository and issue tracker is
 [github.com/ijl/orjson](https://github.com/ijl/orjson), and patches may be
 submitted there. There is a
 [CHANGELOG](https://github.com/ijl/orjson/blob/master/CHANGELOG.md)
@@ -692,7 +692,7 @@ b'"2100-09-01T21:55:02"'
 ```
 
 `datetime.datetime` supports instances with a `tzinfo` that is `None`,
-`datetime.timezone.utc`, a timezone instance from the python3.9+ `zoneinfo`
+`datetime.timezone.utc`, a timezone instance from the standard library `zoneinfo`
 module, or a timezone instance from the third-party `pendulum`, `pytz`, or
 `dateutil`/`arrow` libraries.
 
@@ -1068,7 +1068,7 @@ functions and objects using the normal `PyImport_*` APIs.
 
 ## Packaging
 
-To package orjson requires at least [Rust](https://www.rust-lang.org/) 1.85,
+To package orjson requires at least [Rust](https://www.rust-lang.org/) 1.89,
 a C compiler, and the [maturin](https://github.com/PyO3/maturin) build tool.
 The recommended build command is:
 
@@ -1076,7 +1076,7 @@ The recommended build command is:
 maturin build --release --strip
 ```
 
-The project's own CI tests against `nightly-2025-12-01` and stable 1.85. It
+The project's own CI tests against `nightly-2025-12-01` and stable 1.89. It
 is prudent to pin the nightly version because that channel can introduce
 breaking changes. There is a significant performance benefit to using
 nightly.
@@ -1100,5 +1100,6 @@ with `pytest -q test`.
 
 ## License
 
-orjson was written by ijl <<ijl@mailbox.org>>, copyright 2018 - 2025, available
-to you under either the Apache 2 license or MIT license at your choice.
+orjson was written by ijl <<ijl@mailbox.org>>, copyright 2018 - 2026, with
+some source files available under the Mozilla Public License 2.0 and some
+available under your choice of the Apache 2 license or MIT license.

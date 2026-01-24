@@ -1,15 +1,11 @@
-// SPDX-License-Identifier: (Apache-2.0 OR MIT)
-// Copyright ijl (2021-2025)
+// SPDX-License-Identifier: MPL-2.0
+// Copyright ijl (2021-2026)
 
 fn main() {
     let python_config = pyo3_build_config::get();
 
     if python_config.is_free_threaded() && std::env::var("ORJSON_BUILD_FREETHREADED").is_err() {
         not_supported("free-threaded Python")
-    }
-
-    for cfg in python_config.build_script_outputs() {
-        println!("{cfg}");
     }
 
     #[allow(unused_variables)]
@@ -21,10 +17,16 @@ fn main() {
             #[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
             if is_64_bit_python {
                 println!("cargo:rustc-cfg=feature=\"inline_int\"");
+                #[cfg(target_endian = "little")]
+                println!("cargo:rustc-cfg=feature=\"inline_str\"");
             }
         }
         pyo3_build_config::PythonImplementation::GraalPy => not_supported("GraalPy"),
         pyo3_build_config::PythonImplementation::PyPy => not_supported("PyPy"),
+    }
+
+    for cfg in python_config.build_script_outputs() {
+        println!("{cfg}");
     }
 
     println!("cargo:rerun-if-changed=build.rs");
@@ -44,12 +46,11 @@ fn main() {
     println!("cargo:rustc-check-cfg=cfg(Py_3_13)");
     println!("cargo:rustc-check-cfg=cfg(Py_3_14)");
     println!("cargo:rustc-check-cfg=cfg(Py_3_15)");
-    println!("cargo:rustc-check-cfg=cfg(Py_3_9)");
     println!("cargo:rustc-check-cfg=cfg(Py_GIL_DISABLED)");
     println!("cargo:rustc-check-cfg=cfg(PyPy)");
 
     #[cfg(all(target_arch = "x86_64", not(target_os = "macos")))]
-    if version_check::is_min_version("1.89.0").unwrap_or(false) && is_64_bit_python {
+    if is_64_bit_python {
         println!("cargo:rustc-cfg=feature=\"avx512\"");
     }
 

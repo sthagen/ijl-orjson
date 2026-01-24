@@ -6,8 +6,8 @@ description = "Fast, correct Python JSON library supporting dataclasses, datetim
 repository = "https://github.com/ijl/orjson"
 edition = "2024"
 resolver = "3"
-rust-version = "1.85"
-license = "Apache-2.0 OR MIT"
+rust-version = "1.89"
+license = "MPL-2.0 AND (Apache-2.0 OR MIT)"
 keywords = ["fast", "json", "dataclass", "dataclasses", "datetime", "rfc", "8259", "3339"]
 include = [
     "Cargo.toml",
@@ -15,6 +15,7 @@ include = [
     "include/yyjson",
     "LICENSE-APACHE",
     "LICENSE-MIT",
+    "LICENSE-MPL-2.0",
     "pyproject.toml",
     "README.md",
     "src",
@@ -37,6 +38,7 @@ avx512 = []
 cold_path = []
 generic_simd = []
 inline_int = []
+inline_str = []
 optimize = []
 
 [dependencies]
