@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: MPL-2.0
-// Copyright ijl (2021-2025)
+// Copyright ijl (2021-2026)
 
 mod buffer;
+pub(crate) mod datetime;
 mod error;
+mod numpy;
 mod obtype;
 mod per_type;
 mod serializer;

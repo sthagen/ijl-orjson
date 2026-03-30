@@ -8,10 +8,13 @@ mod buffer;
 mod bytes;
 pub(crate) mod compat;
 mod fragment;
+mod numpy;
 mod pyboolref;
 #[cfg(all(CPython, not(Py_GIL_DISABLED)))]
 mod pybytearrayref;
 mod pybytesref;
+mod pydateref;
+mod pydatetimeref;
 mod pydictref;
 mod pyfloatref;
 mod pyfragmentref;
@@ -21,9 +24,17 @@ mod pylistref;
 mod pymemoryview;
 mod pynoneref;
 mod pystrref;
+mod pytimeref;
 mod pytupleref;
 mod pyuuidref;
 mod utf8;
+
+pub(crate) use numpy::{
+    NPY_ARRAY_C_CONTIGUOUS, NPY_ARRAY_NOTSWAPPED, NumpyBool, NumpyDateTimeError, NumpyDatetime64,
+    NumpyDatetime64Repr, NumpyDatetimeUnit, NumpyFloat16, NumpyFloat32, NumpyFloat64, NumpyInt8,
+    NumpyInt16, NumpyInt32, NumpyInt64, NumpyUint8, NumpyUint16, NumpyUint32, NumpyUint64,
+    PyArrayInterface, PyCapsule,
+};
 
 pub(crate) use compat::*;
 
@@ -33,6 +44,8 @@ pub(crate) use {
     fragment::{Fragment, orjson_fragmenttype_new},
     pyboolref::PyBoolRef,
     pybytesref::{PyBytesRef, PyBytesRefError},
+    pydateref::PyDateRef,
+    pydatetimeref::PyDateTimeRef,
     pydictref::PyDictRef,
     pyfloatref::PyFloatRef,
     pyfragmentref::{PyFragmentRef, PyFragmentRefError},
@@ -40,6 +53,7 @@ pub(crate) use {
     pylistref::PyListRef,
     pynoneref::PyNoneRef,
     pystrref::{PyStrRef, PyStrSubclassRef, set_str_create_fn},
+    pytimeref::PyTimeRef,
     pytupleref::PyTupleRef,
     pyuuidref::PyUuidRef,
 };
