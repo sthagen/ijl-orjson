@@ -38,7 +38,8 @@ TO_EXCLUDE = {
     "script/pybench",
     "script/pytest",
     "script/valgrind",
-    "src/ffi/atomiculong.rs",
+    "src/serialize/writer/half.rs",
+    "src/serialize/writer/uuid.rs",
 }
 
 
