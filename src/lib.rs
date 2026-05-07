@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: MPL-2.0
 // Copyright ijl (2018-2026)
 
-#![cfg_attr(feature = "cold_path", feature(cold_path))]
 #![cfg_attr(feature = "generic_simd", feature(portable_simd))]
 #![cfg_attr(feature = "optimize", feature(optimize_attribute))]
 #![allow(unused_features)] // portable_simd on universal2 cross-compile
-#![allow(stable_features)] // MSRV 1.95, cold_path
+#![allow(stable_features)]
 #![allow(static_mut_refs)]
 #![allow(unused_unsafe)]
 #![warn(clippy::complexity)]

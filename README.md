@@ -1069,7 +1069,7 @@ functions and objects using the normal `PyImport_*` APIs.
 
 ## Packaging
 
-To package orjson requires at least [Rust](https://www.rust-lang.org/) 1.89,
+To package orjson requires at least [Rust](https://www.rust-lang.org/) 1.95,
 a C compiler, and the [maturin](https://github.com/PyO3/maturin) build tool.
 The recommended build command is:
 
@@ -1077,7 +1077,7 @@ The recommended build command is:
 maturin build --release --strip
 ```
 
-The project's own CI tests against `nightly-2026-03-28` and stable 1.89. It
+The project's own CI tests against `nightly-2026-05-01` and stable 1.95. It
 is prudent to pin the nightly version because that channel can introduce
 breaking changes. There is a significant performance benefit to using
 nightly.

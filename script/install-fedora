@@ -5,9 +5,18 @@ set -eou pipefail
 export VENV="${VENV:-.venv}"
 export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-target}"
 
-rm /etc/yum.repos.d/fedora-cisco-openh264.repo || true
+rm -f /etc/yum.repos.d/fedora-cisco-openh264.repo || true
+echo 'max_parallel_downloads=10' >> /etc/dnf/dnf.conf
+echo 'timeout=1' >> /etc/dnf/dnf.conf
 
-dnf install --setopt=install_weak_deps=false -y rustup clang lld "${PYTHON_PACKAGE}" python3-uv
+packages="rustup clang lld "${PYTHON_PACKAGE}" python3-uv"
+
+if [[ $# -gt 1 ]]; then
+    packages="${packages} $@"
+fi
+
+
+dnf install --setopt=install_weak_deps=false -y $packages
 
 rustup-init --default-toolchain "${RUST_TOOLCHAIN}-${TARGET}" --profile minimal --component rust-src -y
 source "${HOME}/.cargo/env"

@@ -1,12 +1,12 @@
 [package]
 name = "orjson"
-version = "3.11.8"
+version = "3.11.9"
 authors = ["ijl <ijl@mailbox.org>"]
 description = "Fast, correct Python JSON library supporting dataclasses, datetimes, and numpy"
 repository = "https://github.com/ijl/orjson"
 edition = "2024"
 resolver = "3"
-rust-version = "1.89"
+rust-version = "1.95"
 license = "MPL-2.0 AND (Apache-2.0 OR MIT)"
 keywords = ["fast", "json", "dataclass", "dataclasses", "datetime", "rfc", "8259", "3339"]
 include = [
@@ -33,9 +33,7 @@ default = []
 # Avoid bundling libgcc on musl.
 unwind = ["unwinding"]
 
-# Features detected by build.rs. Do not specify.
 avx512 = []
-cold_path = []
 generic_simd = []
 inline_int = []
 inline_str = []
@@ -61,7 +59,6 @@ zmij = { version = "1", default-features = false }
 [build-dependencies]
 cc = { version = "1" }
 pyo3-build-config = { version = "0.28" }
-version_check = { version = "0.9" }
 
 [profile.dev]
 codegen-units = 1

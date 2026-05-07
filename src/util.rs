@@ -53,7 +53,6 @@ macro_rules! opt_disabled {
 
 macro_rules! cold_path {
     () => {
-        #[cfg(feature = "cold_path")]
         core::hint::cold_path();
     };
 }

@@ -1,6 +1,17 @@
 # Changelog
 
 
+## 3.11.9 - 2026-05-06
+
+### Changed
+
+- Build now depends on Rust 1.95 or later instead of 1.89.
+
+### Fixed
+
+- Fix building on Rust 1.95.
+
+
 ## 3.11.8 - 2026-03-31
 
 ### Changed

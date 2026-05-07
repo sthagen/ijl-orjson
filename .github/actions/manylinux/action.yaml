@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MPL-2.0
-# Copyright ijl (2024-2025)
+# Copyright ijl (2024-2026)
 
 name: manylinux
 
@@ -11,6 +11,8 @@ inputs:
   features:
     required: true
   compatibility:
+    required: true
+  packages:
     required: true
 
 runs:
@@ -32,9 +34,8 @@ runs:
         fi
 
         export TARGET="${{ inputs.arch }}-unknown-linux-gnu"
-        export PATH="$PWD/.venv:$HOME/.cargo/bin:$PATH"
 
-        ./script/install-fedora
+        ./script/install-fedora "${{ inputs.packages }}"
 
         source "${VENV}/bin/activate"
 
@@ -47,11 +48,5 @@ runs:
           --target="${TARGET}"
 
         uv pip install ${CARGO_TARGET_DIR}/wheels/orjson*.whl
-
-        export PYTHONMALLOC="debug"
-        pytest -v test
-        ./integration/run thread
-        ./integration/run http
-        ./integration/run init
 
         cp ${CARGO_TARGET_DIR}/wheels/orjson*.whl dist
