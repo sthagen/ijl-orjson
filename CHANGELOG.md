@@ -1,5 +1,13 @@
 # Changelog
 
+## 3.12.0 - 2026-08-14
+
+### Changed
+
+- Serialization implementation substantially rewritten.
+- Publish PyPI wheels for Python 3.15. For Python 3.15 and later,
+`manylinux_2_39` (2024) is targeted instead of `manylinux_2_17` (2012).
+- No longer publish PyPI wheels for ppc64le and s390x.
 
 ## 3.11.9 - 2026-05-06
 
