@@ -4,8 +4,11 @@
 use crate::ffi::{Py_DECREF, PyListRef, PyObject, PyObject_GetAttr, PyStrRef, PyTupleRef};
 use crate::opt::Opt;
 use crate::typeref::{DESCR_STR, DTYPE_STR};
-use jiff::Timestamp;
-use jiff::civil::DateTime;
+use jiff_core::{
+    Timestamp,
+    civil::{Date, DateTime, Time},
+    tz::Offset,
+};
 
 /// This mimicks the units supported by numpy's datetime64 type.
 ///
@@ -66,8 +69,7 @@ macro_rules! to_jiff_datetime {
                 unit: $self,
                 val: $val,
             })?)
-            .to_zoned(jiff::tz::TimeZone::UTC)
-            .datetime(),
+            .to_datetime(Offset::UTC),
         )
     };
 }
@@ -166,45 +168,59 @@ impl NumpyDatetimeUnit {
             _ => Err(NumpyDateTimeError::UnsupportedUnit(self)),
         };
         match datetime {
-            Ok(dt) => match dt.year() {
-                0..=9999 => Ok(NumpyDatetime64Repr { dt, opts }),
-                _ => Err(NumpyDateTimeError::Unrepresentable { unit: self, val }),
-            },
+            Ok(dt) => {
+                let date = dt.date();
+                match date.year() {
+                    0..=9999 => Ok(NumpyDatetime64Repr::new(date, dt.time(), opts)),
+                    _ => Err(NumpyDateTimeError::Unrepresentable { unit: self, val }),
+                }
+            }
             Err(err) => Err(err),
         }
     }
 }
 
 macro_rules! forward_inner {
-    ($meth: ident, $ty: ident) => {
+    ($meth: ident, $subobj: ident, $ty: ident) => {
         pub fn $meth(&self) -> $ty {
-            debug_assert!(self.dt.$meth() >= 0);
+            let val = self.$subobj.$meth();
+            debug_assert!(val >= 0);
             #[allow(clippy::cast_sign_loss)]
-            let ret = self.dt.$meth() as $ty; // stmt_expr_attributes
+            let ret = val as $ty; // stmt_expr_attributes
             ret
         }
     };
 }
 
 pub(crate) struct NumpyDatetime64Repr {
-    pub dt: DateTime,
+    pub date: Date,
+    pub time: Time,
     pub opts: Opt,
 }
 
 impl NumpyDatetime64Repr {
-    forward_inner!(year, i32);
-    forward_inner!(month, u8);
-    forward_inner!(day, u8);
-    forward_inner!(hour, u8);
-    forward_inner!(minute, u8);
-    forward_inner!(second, u8);
+    pub fn new(date: Date, time: Time, opts: Opt) -> Self {
+        NumpyDatetime64Repr {
+            date: date,
+            time: time,
+            opts: opts,
+        }
+    }
+
+    forward_inner!(year, date, i32);
+    forward_inner!(month, date, u8);
+    forward_inner!(day, date, u8);
+    forward_inner!(hour, time, u8);
+    forward_inner!(minute, time, u8);
+    forward_inner!(second, time, u8);
 
     pub fn nanosecond(&self) -> u32 {
-        debug_assert!(self.dt.subsec_nanosecond() >= 0);
-        self.dt.subsec_nanosecond().cast_unsigned()
+        let val = self.time.subsec_nanosecond();
+        debug_assert!(val >= 0);
+        val.cast_unsigned()
     }
 
     pub fn microsecond(&self) -> u32 {
-        self.nanosecond() / 1_000
+        self.nanosecond() / 1000
     }
 }

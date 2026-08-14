@@ -90,7 +90,7 @@ pub(crate) unsafe fn Py_HashBuffer(
     ptr: *const core::ffi::c_void,
     len: pyo3_ffi::Py_ssize_t,
 ) -> pyo3_ffi::Py_hash_t {
-    unsafe { pyo3_ffi::_Py_HashBytes(ptr, len) }
+    unsafe { _Py_HashBytes(ptr, len) }
 }
 
 #[cfg(not(Py_3_13))]
@@ -320,4 +320,16 @@ unsafe extern "C" {
         little_endian: core::ffi::c_int,
         is_signed: core::ffi::c_int,
     ) -> core::ffi::c_int;
+
+    #[cfg(CPython)]
+    pub(crate) fn _PyUnicode_CheckConsistency(
+        op: *mut pyo3_ffi::PyObject,
+        check_context: core::ffi::c_int,
+    ) -> core::ffi::c_int;
+
+    #[cfg(not(Py_3_14))]
+    pub(crate) fn _Py_HashBytes(
+        ptr: *const core::ffi::c_void,
+        len: pyo3_ffi::Py_ssize_t,
+    ) -> pyo3_ffi::Py_hash_t;
 }

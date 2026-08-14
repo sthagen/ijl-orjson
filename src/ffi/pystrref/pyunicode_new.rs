@@ -7,7 +7,7 @@ use crate::util::usize_to_isize;
 macro_rules! validate_str {
     ($ptr:expr) => {
         #[cfg(all(CPython, not(Py_LIMITED_ABI)))]
-        debug_assert!(pyo3_ffi::_PyUnicode_CheckConsistency($ptr.cast::<PyObject>(), 1) == 1)
+        debug_assert!(crate::ffi::_PyUnicode_CheckConsistency($ptr.cast::<PyObject>(), 1) == 1)
     };
 }
 

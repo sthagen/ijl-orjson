@@ -194,13 +194,13 @@ macro_rules! unreachable_unchecked {
 
 #[inline(always)]
 #[allow(clippy::cast_possible_wrap)]
-pub(crate) fn usize_to_isize(val: usize) -> isize {
+pub(crate) const fn usize_to_isize(val: usize) -> isize {
     debug_assert!(val < (isize::MAX as usize));
     val as isize
 }
 
 #[inline(always)]
-pub(crate) fn isize_to_usize(val: isize) -> usize {
+pub(crate) const fn isize_to_usize(val: isize) -> usize {
     debug_assert!(val >= 0);
     val.cast_unsigned()
 }

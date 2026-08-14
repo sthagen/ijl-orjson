@@ -1073,10 +1073,11 @@ class TestNumpy:
         )
 
     def test_numpy_datetime_nat(self):
+        obj = numpy.datetime64("NaT", "Y")
         with pytest.raises(orjson.JSONEncodeError):
-            orjson.dumps(numpy.datetime64("NaT"), option=orjson.OPT_SERIALIZE_NUMPY)
+            orjson.dumps(obj, option=orjson.OPT_SERIALIZE_NUMPY)
         with pytest.raises(orjson.JSONEncodeError):
-            orjson.dumps([numpy.datetime64("NaT")], option=orjson.OPT_SERIALIZE_NUMPY)
+            orjson.dumps([obj], option=orjson.OPT_SERIALIZE_NUMPY)
 
     def test_numpy_repeated(self):
         data = numpy.array([[[1, 2], [3, 4], [5, 6], [7, 8]]], numpy.int64)  # type: ignore
