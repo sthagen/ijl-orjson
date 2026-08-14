@@ -19,6 +19,34 @@ impl PartialEq for PyDictRef {
     }
 }
 
+#[cfg(all(Py_3_12, not(Py_GIL_DISABLED)))]
+#[inline]
+fn reverse_pydict_incref(key: *mut pyo3_ffi::PyObject, value: *mut pyo3_ffi::PyObject) {
+    unsafe {
+        if crate::ffi::_Py_IsImmortal(key) == 0 {
+            (*key).ob_refcnt.ob_refcnt -= 1;
+        }
+        if crate::ffi::_Py_IsImmortal(value) == 0 {
+            (*value).ob_refcnt.ob_refcnt -= 1;
+        }
+    }
+}
+
+#[cfg(Py_GIL_DISABLED)]
+#[inline]
+fn reverse_pydict_incref(_: *mut pyo3_ffi::PyObject, value: *mut pyo3_ffi::PyObject) {
+    unsafe { crate::ffi::Py_DECREF(value) }
+}
+
+#[cfg(not(Py_3_12))]
+#[inline]
+fn reverse_pydict_incref(key: *mut pyo3_ffi::PyObject, value: *mut pyo3_ffi::PyObject) {
+    unsafe {
+        (*key).ob_refcnt -= 1;
+        (*value).ob_refcnt -= 1;
+    }
+}
+
 impl PyDictRef {
     #[cfg(CPython)]
     #[inline]
@@ -104,9 +132,7 @@ impl PyDictRef {
                 key.hash(),
             );
         }
-        #[cfg(not(Py_GIL_DISABLED))]
-        reverse_pydict_incref!(key.as_ptr());
-        reverse_pydict_incref!(value);
+        reverse_pydict_incref(key.as_ptr(), value);
     }
 
     #[cfg(not(CPython))]
@@ -115,8 +141,6 @@ impl PyDictRef {
         unsafe {
             let _ = crate::ffi::PyDict_SetItem(self.as_ptr(), key.as_ptr(), value);
         }
-        #[cfg(not(Py_GIL_DISABLED))]
-        reverse_pydict_incref!(key.as_ptr());
-        reverse_pydict_incref!(value);
+        reverse_pydict_incref(key.as_ptr(), value);
     }
 }

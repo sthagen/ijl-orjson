@@ -172,10 +172,10 @@ impl PyStrRef {
             let ptr = self.as_ptr().cast::<PyASCIIObject>();
             let data_ptr: *mut core::ffi::c_void =
                 if (*ptr).state & STATE_COMPACT_ASCII == STATE_COMPACT_ASCII {
-                    ptr.offset(1).cast::<core::ffi::c_void>()
+                    ptr.add(1).cast::<core::ffi::c_void>()
                 } else {
                     ptr.cast::<PyCompactUnicodeObject>()
-                        .offset(1)
+                        .add(1)
                         .cast::<core::ffi::c_void>()
                 };
             #[allow(clippy::cast_possible_wrap)]
@@ -205,7 +205,7 @@ impl PyStrRef {
         unsafe {
             let op = self.as_ptr();
             if (*op.cast::<PyASCIIObject>()).state & STATE_COMPACT_ASCII == STATE_COMPACT_ASCII {
-                let ptr = op.cast::<PyASCIIObject>().offset(1).cast::<u8>();
+                let ptr = op.cast::<PyASCIIObject>().add(1).cast::<u8>();
                 let len = crate::util::isize_to_usize((*op.cast::<PyASCIIObject>()).length);
                 Some(str_from_slice!(ptr, len))
             } else if (*op.cast::<PyASCIIObject>()).state & STATE_COMPACT_ASCII == 0 {
@@ -239,7 +239,7 @@ impl PyStrSubclassRef {
         let ob_type = unsafe { crate::ffi::PyObject_Type(ptr) };
         let tp_flags = unsafe { crate::ffi::PyType_GetFlags(ob_type) };
         debug_assert!(!ptr.is_null());
-        debug_assert!(!is_class_by_type!(ob_type, STR_TYPE));
+        debug_assert!(unsafe { ob_type != STR_TYPE });
         debug_assert!(is_subclass_by_flag!(tp_flags, Py_TPFLAGS_UNICODE_SUBCLASS));
         PyStrSubclassRef { ptr: nonnull!(ptr) }
     }

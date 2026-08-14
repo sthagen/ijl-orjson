@@ -1,6 +1,38 @@
 // SPDX-License-Identifier: MPL-2.0
 // Copyright ijl (2024-2026)
 
+#[repr(transparent)]
+pub(crate) struct PyTypeRef {
+    ptr: core::ptr::NonNull<pyo3_ffi::PyTypeObject>,
+}
+
+unsafe impl Send for PyTypeRef {}
+unsafe impl Sync for PyTypeRef {}
+
+impl PartialEq for PyTypeRef {
+    fn eq(&self, other: &Self) -> bool {
+        core::ptr::eq(self.ptr.as_ptr(), other.ptr.as_ptr())
+    }
+}
+
+impl PyTypeRef {
+    pub(crate) fn from_pyobject(ptr: *mut pyo3_ffi::PyObject) -> Self {
+        unsafe {
+            debug_assert!(!ptr.is_null());
+            let type_ptr = (*ptr).ob_type;
+            debug_assert!(!type_ptr.is_null());
+            Self {
+                ptr: core::ptr::NonNull::new_unchecked(type_ptr),
+            }
+        }
+    }
+
+    #[inline]
+    pub(crate) const fn as_ptr(&self) -> *mut pyo3_ffi::PyTypeObject {
+        self.ptr.as_ptr()
+    }
+}
+
 #[cfg(Py_GIL_DISABLED)]
 #[allow(non_upper_case_globals)]
 pub(crate) const _Py_IMMORTAL_REFCNT_LOCAL: u32 = u32::MAX;

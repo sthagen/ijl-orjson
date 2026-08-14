@@ -5,14 +5,14 @@ use crate::ffi::{PyDateRef, PyDateTimeRef, PyTimeRef};
 use crate::opt::{NAIVE_UTC, OMIT_MICROSECONDS, Opt, UTC_Z};
 use crate::serialize::{
     error::SerializeError,
-    writer::{WriteExt, write_integer_u32},
+    writer::{JsonWriter, write_integer_u32},
 };
 
 #[cold]
 #[inline(never)]
 pub(crate) fn write_time<B>(ob: PyTimeRef, opts: Opt, buf: &mut B) -> Result<(), SerializeError>
 where
-    B: ?Sized + WriteExt + bytes::BufMut,
+    B: JsonWriter,
 {
     if ob.has_tz() {
         return Err(SerializeError::TimeHasTzinfo);
@@ -23,7 +23,18 @@ where
     buf.put_u8(b':');
     write_double_digit!(buf, ob.second() as u32);
     if opt_disabled!(opts, OMIT_MICROSECONDS) {
-        write_microsecond!(buf, ob.microsecond());
+        let microsecond = ob.microsecond();
+        if microsecond != 0 {
+            buf.put_u8(b'.');
+            match microsecond {
+                0..=9 => buf.put_slice(b"00000"),
+                10..=99 => buf.put_slice(b"0000"),
+                100..=999 => buf.put_slice(b"000"),
+                1000..=9999 => buf.put_slice(b"00"),
+                _ => {}
+            }
+            write_integer_u32(buf, microsecond);
+        }
     }
     Ok(())
 }
@@ -32,7 +43,7 @@ where
 #[inline(never)]
 pub(crate) fn write_date<B>(ob: PyDateRef, buf: &mut B)
 where
-    B: ?Sized + WriteExt + bytes::BufMut,
+    B: JsonWriter,
 {
     unsafe {
         let year = ob.year();
@@ -62,7 +73,7 @@ pub(crate) fn write_datetime<B>(
     buf: &mut B,
 ) -> Result<(), SerializeError>
 where
-    B: ?Sized + WriteExt + bytes::BufMut,
+    B: JsonWriter,
 {
     {
         let year = ob.year();

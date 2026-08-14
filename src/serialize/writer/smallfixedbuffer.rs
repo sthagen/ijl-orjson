@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: MPL-2.0
 // Copyright ijl (2023-2026)
 
-use crate::serialize::writer::WriteExt;
-use bytes::{BufMut, buf::UninitSlice};
+use crate::serialize::writer::JsonWriter;
 use core::mem::MaybeUninit;
 
 const BUFFER_LENGTH: usize = 64 - core::mem::size_of::<usize>();
@@ -29,7 +28,7 @@ impl SmallFixedBuffer {
     }
 
     #[inline]
-    pub fn len(&self) -> usize {
+    pub const fn len(&self) -> usize {
         self.idx
     }
 
@@ -40,20 +39,25 @@ impl SmallFixedBuffer {
     }
 }
 
-unsafe impl BufMut for SmallFixedBuffer {
+unsafe impl JsonWriter for SmallFixedBuffer {
+    #[inline(always)]
+    fn as_mut_buffer_ptr(&mut self) -> *mut u8 {
+        unsafe { (&raw mut self.bytes).cast::<u8>().add(self.idx) }
+    }
+
     #[inline]
     unsafe fn advance_mut(&mut self, cnt: usize) {
         self.idx += cnt;
     }
 
     #[inline]
-    fn chunk_mut(&mut self) -> &mut UninitSlice {
-        UninitSlice::uninit(&mut self.bytes)
+    fn remaining_mut(&self) -> usize {
+        BUFFER_LENGTH - self.idx
     }
 
     #[inline]
-    fn remaining_mut(&self) -> usize {
-        BUFFER_LENGTH - self.idx
+    fn put_null(&mut self) {
+        self.put_slice(b"null");
     }
 
     #[inline]
@@ -66,38 +70,39 @@ unsafe impl BufMut for SmallFixedBuffer {
     }
 
     #[inline]
+    fn put_bytes(&mut self, val: u8, cnt: usize) {
+        debug_assert!(self.remaining_mut() > cnt);
+        debug_assert!(self.remaining_mut() > 8);
+        unsafe {
+            core::ptr::write_bytes((&raw mut self.bytes).cast::<u8>().add(self.idx), val, cnt);
+            self.advance_mut(cnt);
+        };
+    }
+
+    #[inline]
     fn put_slice(&mut self, src: &[u8]) {
         debug_assert!(self.remaining_mut() > src.len());
         unsafe {
+            let len = src.len();
             core::ptr::copy_nonoverlapping(
                 src.as_ptr(),
                 (&raw mut self.bytes).cast::<u8>().add(self.idx),
-                src.len(),
+                len,
             );
-            self.advance_mut(src.len());
+            self.advance_mut(len);
         }
     }
-}
 
-impl WriteExt for SmallFixedBuffer {
-    #[inline(always)]
-    fn as_mut_buffer_ptr(&mut self) -> *mut u8 {
-        unsafe { self.as_ptr().cast_mut().add(self.idx) }
-    }
-
-    fn reserve(&mut self, _len: usize) {
-        unimplemented!()
+    fn reserve(&mut self, _: usize) {
+        unimplemented!();
     }
 
     fn reserve_minimum(&mut self) {
-        unimplemented!()
+        unimplemented!();
     }
 
-    fn put_bool(&mut self, _val: bool) {
-        unimplemented!()
-    }
-
-    fn put_null(&mut self) {
-        unimplemented!()
+    #[inline]
+    fn quote(&mut self) {
+        self.put_u8(b'"');
     }
 }

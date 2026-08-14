@@ -50,6 +50,7 @@ fn main() {
     println!("cargo:rustc-check-cfg=cfg(Py_GIL_DISABLED)");
     println!("cargo:rustc-check-cfg=cfg(Py_LIMITED_ABI)");
     println!("cargo:rustc-check-cfg=cfg(PyPy)");
+    println!("cargo:rustc-check-cfg=cfg(trusted_len)");
 
     #[cfg(all(target_arch = "x86_64", not(target_os = "macos")))]
     if is_64_bit_python {

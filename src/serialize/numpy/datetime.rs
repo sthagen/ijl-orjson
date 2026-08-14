@@ -5,7 +5,7 @@ use crate::ffi::{NumpyDateTimeError, NumpyDatetime64Repr, PyStrRef};
 use crate::opt::{NAIVE_UTC, OMIT_MICROSECONDS, UTC_Z};
 use crate::serialize::{
     error::SerializeError,
-    writer::{SmallFixedBuffer, WriteExt, write_integer_i64, write_integer_u32},
+    writer::{JsonWriter, SmallFixedBuffer, write_integer_i64, write_integer_u32},
 };
 
 pub(crate) fn datetime_into_error(val: NumpyDateTimeError) -> SerializeError {
@@ -32,10 +32,10 @@ pub(crate) fn datetime_into_error(val: NumpyDateTimeError) -> SerializeError {
 
 pub(crate) fn write_numpy_datetime<B>(ob: &NumpyDatetime64Repr, buf: &mut B)
 where
-    B: ?Sized + WriteExt + bytes::BufMut,
+    B: JsonWriter,
 {
     {
-        // buf.put_u8(b'"');
+        buf.put_u8(b'"');
         let year = ob.year();
         if year < 1000 {
             cold_path!();
@@ -75,5 +75,5 @@ where
             buf.put_slice(b"+00:00");
         }
     }
-    // buf.put_u8(b'"');
+    buf.put_u8(b'"');
 }

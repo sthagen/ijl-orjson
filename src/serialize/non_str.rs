@@ -8,9 +8,9 @@ use crate::serialize::{
     datetime::{write_date, write_datetime, write_time},
     error::SerializeError,
     obtype::ObType,
-    writer::{
-        SmallFixedBuffer, pyobject_to_obtype, write_float64, write_integer_i64, write_integer_u64,
-    },
+    obtype::pyobject_to_obtype,
+    uuid::write_uuid,
+    writer::{SmallFixedBuffer, write_float64, write_integer_i64, write_integer_u64},
 };
 use crate::typeref::{TRUE, VALUE_STR};
 
@@ -59,7 +59,7 @@ fn non_str_time(key: PyTimeRef, opts: crate::opt::Opt) -> Result<String, Seriali
 #[allow(clippy::unnecessary_wraps)]
 fn non_str_uuid(key: PyUuidRef) -> Result<String, SerializeError> {
     let mut buf = SmallFixedBuffer::new();
-    UUID::new(key).write_buf(&mut buf);
+    write_uuid(key, &mut buf);
     Ok(buf.to_string())
 }
 
@@ -75,7 +75,9 @@ fn non_str_int(key: *mut crate::ffi::PyObject) -> Result<String, SerializeError>
     let ival = unsafe { crate::ffi::PyLong_AsLongLong(key) };
     if ival == -1 && unsafe { !crate::ffi::PyErr_Occurred().is_null() } {
         cold_path!();
-        unsafe { crate::ffi::PyErr_Clear() };
+        unsafe {
+            crate::ffi::PyErr_Clear();
+        }
         let uval = unsafe { crate::ffi::PyLong_AsUnsignedLongLong(key) };
         if uval == u64::MAX && unsafe { !crate::ffi::PyErr_Occurred().is_null() } {
             cold_path!();
@@ -117,7 +119,9 @@ pub(crate) fn pyobject_to_string(
                 let value = unsafe { crate::ffi::PyObject_GetAttr(key, VALUE_STR) };
                 debug_assert!(unsafe { crate::ffi::Py_REFCNT(value) >= 2 });
                 let ret = pyobject_to_string(value, opts);
-                unsafe { crate::ffi::Py_DECREF(value) };
+                unsafe {
+                    crate::ffi::Py_DECREF(value);
+                }
                 ret
             }
             ObType::Str => non_str_str(PyStrRef::from_ptr_unchecked(key)),
