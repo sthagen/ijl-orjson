@@ -31,13 +31,13 @@ pub(crate) static mut FLOAT_TYPE: *mut PyTypeObject = null_mut();
 pub(crate) static mut LIST_TYPE: *mut PyTypeObject = null_mut();
 pub(crate) static mut DICT_TYPE: *mut PyTypeObject = null_mut();
 pub(crate) static mut DATETIME_TYPE: *mut PyTypeObject = null_mut();
+pub(crate) static mut UUID_TYPE: *mut PyTypeObject = null_mut();
+pub(crate) static mut TUPLE_TYPE: *mut PyTypeObject = null_mut();
 pub(crate) static mut DATE_TYPE: *mut PyTypeObject = null_mut();
 pub(crate) static mut TIME_TYPE: *mut PyTypeObject = null_mut();
-pub(crate) static mut TUPLE_TYPE: *mut PyTypeObject = null_mut();
-pub(crate) static mut UUID_TYPE: *mut PyTypeObject = null_mut();
+pub(crate) static mut FRAGMENT_TYPE: *mut PyTypeObject = null_mut();
 pub(crate) static mut ENUM_TYPE: *mut PyTypeObject = null_mut();
 pub(crate) static mut FIELD_TYPE: *mut PyTypeObject = null_mut();
-pub(crate) static mut FRAGMENT_TYPE: *mut PyTypeObject = null_mut();
 
 pub(crate) static mut ZONEINFO_TYPE: *mut PyTypeObject = null_mut();
 

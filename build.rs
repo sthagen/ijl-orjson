@@ -50,6 +50,7 @@ fn main() {
     println!("cargo:rustc-check-cfg=cfg(Py_GIL_DISABLED)");
     println!("cargo:rustc-check-cfg=cfg(Py_LIMITED_ABI)");
     println!("cargo:rustc-check-cfg=cfg(PyPy)");
+    println!("cargo:rustc-check-cfg=cfg(trusted_len)");
 
     #[cfg(all(target_arch = "x86_64", not(target_os = "macos")))]
     if is_64_bit_python {
@@ -59,10 +60,12 @@ fn main() {
     cc::Build::new()
         .file("include/yyjson/yyjson.c")
         .include("include/yyjson")
+        .define("YYJSON_DISABLE_INCR_READER", "1")
         .define("YYJSON_DISABLE_NON_STANDARD", "1")
         .define("YYJSON_DISABLE_UTF8_VALIDATION", "1")
         .define("YYJSON_DISABLE_UTILS", "1")
         .define("YYJSON_DISABLE_WRITER", "1")
+        .define("YYJSON_READER_DEPTH_LIMIT", "1024")
         .compile("yyjson")
 }
 

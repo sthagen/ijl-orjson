@@ -1,41 +1,9 @@
 // SPDX-License-Identifier: (Apache-2.0 OR MIT)
 // Copyright ijl (2019-2026), Ben Sully (2021), Marc Mueller (2023)
 
-pub(crate) const INVALID_STR: &str = "str is not valid UTF-8: surrogates not allowed";
-
-macro_rules! is_type {
-    ($obj_ptr:expr, $type_ptr:expr) => {
-        unsafe { $obj_ptr == $type_ptr }
-    };
-}
-
-macro_rules! is_class_by_type {
-    ($ob_type:expr, $type_ptr:ident) => {
-        unsafe { $ob_type == $type_ptr }
-    };
-}
-
 macro_rules! is_subclass_by_flag {
     ($tp_flags:expr, $flag:ident) => {
         unsafe { (($tp_flags & crate::ffi::$flag) != 0) }
-    };
-}
-
-macro_rules! is_subclass_by_type {
-    ($ob_type:expr, $type:ident) => {
-        unsafe {
-            (*($ob_type.cast::<crate::ffi::PyTypeObject>()))
-                .ob_base
-                .ob_base
-                .ob_type
-                == $type
-        }
-    };
-}
-
-macro_rules! err {
-    ($msg:expr) => {
-        return Err(serde::ser::Error::custom($msg))
     };
 }
 
@@ -66,55 +34,6 @@ macro_rules! nonnull {
 macro_rules! str_from_slice {
     ($ptr:expr, $size:expr) => {
         unsafe { core::str::from_utf8_unchecked(core::slice::from_raw_parts($ptr, $size as usize)) }
-    };
-}
-
-#[cfg(all(Py_3_12, not(Py_GIL_DISABLED)))]
-macro_rules! reverse_pydict_incref {
-    ($op:expr) => {
-        unsafe {
-            if crate::ffi::_Py_IsImmortal($op) == 0 {
-                (*$op).ob_refcnt.ob_refcnt -= 1;
-            }
-        }
-    };
-}
-
-#[cfg(Py_GIL_DISABLED)]
-macro_rules! reverse_pydict_incref {
-    ($op:expr) => {
-        unsafe { crate::ffi::Py_DECREF($op) }
-    };
-}
-
-#[cfg(not(Py_3_12))]
-macro_rules! reverse_pydict_incref {
-    ($op:expr) => {
-        unsafe {
-            (*$op).ob_refcnt -= 1;
-        }
-    };
-}
-
-macro_rules! ffi {
-    ($fn:ident()) => {
-        unsafe { crate::ffi::$fn() }
-    };
-
-    ($fn:ident($obj1:expr)) => {
-        unsafe { crate::ffi::$fn($obj1) }
-    };
-
-    ($fn:ident($obj1:expr, $obj2:expr)) => {
-        unsafe { crate::ffi::$fn($obj1, $obj2) }
-    };
-
-    ($fn:ident($obj1:expr, $obj2:expr, $obj3:expr)) => {
-        unsafe { crate::ffi::$fn($obj1, $obj2, $obj3) }
-    };
-
-    ($fn:ident($obj1:expr, $obj2:expr, $obj3:expr, $obj4:expr)) => {
-        unsafe { crate::ffi::$fn($obj1, $obj2, $obj3, $obj4) }
     };
 }
 
@@ -194,13 +113,13 @@ macro_rules! unreachable_unchecked {
 
 #[inline(always)]
 #[allow(clippy::cast_possible_wrap)]
-pub(crate) fn usize_to_isize(val: usize) -> isize {
+pub(crate) const fn usize_to_isize(val: usize) -> isize {
     debug_assert!(val < (isize::MAX as usize));
     val as isize
 }
 
 #[inline(always)]
-pub(crate) fn isize_to_usize(val: isize) -> usize {
+pub(crate) const fn isize_to_usize(val: isize) -> usize {
     debug_assert!(val >= 0);
     val.cast_unsigned()
 }
@@ -223,23 +142,5 @@ macro_rules! write_triple_digit {
             $buf.put_u8(b'0');
         }
         crate::serialize::writer::write_integer_u32($buf, $value);
-    };
-}
-
-macro_rules! write_microsecond {
-    ($buf:ident, $microsecond:expr) => {
-        unsafe {
-            if $microsecond != 0 {
-                $buf.put_u8(b'.');
-                match $microsecond {
-                    0..=9 => $buf.put_slice(b"00000"),
-                    10..=99 => $buf.put_slice(b"0000"),
-                    100..=999 => $buf.put_slice(b"000"),
-                    1000..=9999 => $buf.put_slice(b"00"),
-                    _ => {}
-                }
-                crate::serialize::writer::write_integer_u32($buf, $microsecond);
-            }
-        }
     };
 }

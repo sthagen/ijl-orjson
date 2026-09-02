@@ -22,7 +22,7 @@ impl PyListRef {
         unsafe {
             debug_assert!(!ptr.is_null());
             debug_assert!(
-                is_type!(crate::ffi::PyObject_Type(ptr), crate::typeref::LIST_TYPE)
+                crate::ffi::PyObject_Type(ptr) == crate::typeref::LIST_TYPE
                     || is_subclass_by_flag!(
                         crate::ffi::PyType_GetFlags(crate::ffi::PyObject_Type(ptr)),
                         Py_TPFLAGS_LIST_SUBCLASS

@@ -5,8 +5,9 @@ use crate::deserialize::DeserializeError;
 #[cfg(all(CPython, not(Py_GIL_DISABLED)))]
 use crate::ffi::{PyByteArrayRef, PyMemoryViewRef};
 use crate::ffi::{PyBytesRef, PyStrRef};
-use crate::util::INVALID_STR;
 use std::borrow::Cow;
+
+const INVALID_STR: &str = "str is not valid UTF-8: surrogates not allowed";
 
 #[cfg(all(CPython, not(Py_GIL_DISABLED)))]
 const INPUT_TYPE_MESSAGE: &str = "Input must be bytes, bytearray, memoryview, or str";

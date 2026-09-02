@@ -1,14 +1,13 @@
 // SPDX-License-Identifier: MPL-2.0
 // Copyright ijl (2020-2026)
 
+use super::jsonwriter::JsonWriter;
 use crate::ffi::{PyBytes_FromStringAndSize, PyObject};
 use crate::util::usize_to_isize;
-use bytes::{BufMut, buf::UninitSlice};
-use core::mem::MaybeUninit;
 use core::ptr::NonNull;
 
 #[cfg(CPython)]
-const BUFFER_LENGTH: usize = 1024;
+const BUFFER_LENGTH: usize = 4096 - core::mem::size_of::<crate::ffi::PyBytesObject>();
 
 #[cfg(not(CPython))]
 const BUFFER_LENGTH: usize = 4096;
@@ -16,20 +15,22 @@ const BUFFER_LENGTH: usize = 4096;
 const OVERALLOCATION: usize = 64;
 
 pub(crate) struct BytesWriter {
-    cap: usize,
-    len: usize,
     #[cfg(CPython)]
     bytes: *mut crate::ffi::PyBytesObject,
     #[cfg(not(CPython))]
     bytes: *mut u8,
+    cap: usize,
+    len: usize,
+    indent: usize,
 }
 
 impl BytesWriter {
     #[inline]
-    pub fn default() -> Self {
+    pub fn new() -> Self {
         BytesWriter {
             cap: BUFFER_LENGTH,
             len: 0,
+            indent: 0,
             #[cfg(CPython)]
             bytes: unsafe {
                 PyBytes_FromStringAndSize(core::ptr::null_mut(), usize_to_isize(BUFFER_LENGTH))
@@ -96,13 +97,13 @@ impl BytesWriter {
 
     #[cfg(CPython)]
     #[inline]
-    fn buffer_ptr(&self) -> *mut u8 {
+    const fn buffer_ptr(&self) -> *mut u8 {
         unsafe { (&raw mut (*self.bytes).ob_sval).cast::<u8>().add(self.len) }
     }
 
     #[cfg(not(CPython))]
     #[inline]
-    fn buffer_ptr(&self) -> *mut u8 {
+    const fn buffer_ptr(&self) -> *mut u8 {
         debug_assert!(!self.bytes.is_null());
         unsafe { self.bytes.add(self.len) }
     }
@@ -130,7 +131,6 @@ impl BytesWriter {
         }
     }
 
-    #[cold]
     #[inline(never)]
     fn grow(&mut self, len: usize) {
         let mut cap = self.cap;
@@ -139,22 +139,55 @@ impl BytesWriter {
         }
         self.resize(cap);
     }
+
+    #[cfg(feature = "inline_int")]
+    #[inline]
+    pub fn put_bool(&mut self, val: bool) {
+        debug_assert!(self.cap - self.len > 8);
+        unsafe {
+            const TRUE: (u64, usize) = (u64::from_ne_bytes(*b"true0000"), 4);
+            const FALSE: (u64, usize) = (u64::from_ne_bytes(*b"false000"), 5);
+            let (pattern, len) = core::hint::select_unpredictable(val, TRUE, FALSE);
+            #[allow(clippy::cast_ptr_alignment)]
+            core::ptr::write(self.buffer_ptr().cast::<u64>(), pattern);
+            self.advance_mut(len);
+        }
+    }
+
+    #[cfg(not(feature = "inline_int"))]
+    #[inline]
+    pub fn put_bool(&mut self, val: bool) {
+        debug_assert!(self.cap - self.len > 8);
+        self.put_slice(core::hint::select_unpredictable(val, b"true", b"false"));
+    }
+
+    #[inline(always)]
+    pub fn indent(&mut self) {
+        self.indent += INDENT;
+    }
+
+    #[inline(always)]
+    pub fn dedent(&mut self) {
+        self.indent -= INDENT;
+    }
+
+    #[inline(always)]
+    pub fn put_indent(&mut self) {
+        self.put_bytes(b' ', self.indent);
+    }
 }
 
-unsafe impl BufMut for BytesWriter {
+const INDENT: usize = 2;
+
+unsafe impl JsonWriter for BytesWriter {
     #[inline]
-    unsafe fn advance_mut(&mut self, cnt: usize) {
-        self.len += cnt;
+    fn as_mut_buffer_ptr(&mut self) -> *mut u8 {
+        self.buffer_ptr()
     }
 
     #[inline]
-    fn chunk_mut(&mut self) -> &mut UninitSlice {
-        unsafe {
-            UninitSlice::uninit(core::slice::from_raw_parts_mut(
-                self.buffer_ptr().cast::<MaybeUninit<u8>>(),
-                self.remaining_mut(),
-            ))
-        }
+    unsafe fn advance_mut(&mut self, cnt: usize) {
+        self.len += cnt;
     }
 
     #[inline]
@@ -191,25 +224,6 @@ unsafe impl BufMut for BytesWriter {
             self.advance_mut(len);
         }
     }
-}
-
-// hack based on saethlin's research and patch in https://github.com/serde-rs/json/issues/766
-pub(crate) trait WriteExt {
-    fn as_mut_buffer_ptr(&mut self) -> *mut u8;
-
-    fn reserve(&mut self, len: usize);
-
-    fn reserve_minimum(&mut self);
-    fn put_bool(&mut self, val: bool);
-    fn put_null(&mut self);
-}
-
-impl WriteExt for &mut BytesWriter {
-    #[inline(always)]
-    fn as_mut_buffer_ptr(&mut self) -> *mut u8 {
-        self.buffer_ptr()
-    }
-
     #[inline(always)]
     fn reserve(&mut self, len: usize) {
         let end_length = self.len + len;
@@ -224,25 +238,8 @@ impl WriteExt for &mut BytesWriter {
         self.reserve(OVERALLOCATION * 2);
     }
 
-    #[cfg(feature = "inline_int")]
-    #[inline]
-    fn put_bool(&mut self, val: bool) {
-        debug_assert!(self.cap - self.len > 8);
-        unsafe {
-            const TRUE: (u64, usize) = (u64::from_ne_bytes(*b"true0000"), 4);
-            const FALSE: (u64, usize) = (u64::from_ne_bytes(*b"false000"), 5);
-            let (pattern, len) = core::hint::select_unpredictable(val, TRUE, FALSE);
-            #[allow(clippy::cast_ptr_alignment)]
-            core::ptr::write(self.buffer_ptr().cast::<u64>(), pattern);
-            self.advance_mut(len);
-        }
-    }
-
-    #[cfg(not(feature = "inline_int"))]
-    #[inline]
-    fn put_bool(&mut self, val: bool) {
-        debug_assert!(self.cap - self.len > 8);
-        self.put_slice(core::hint::select_unpredictable(val, b"true", b"false"));
+    fn quote(&mut self) {
+        self.put_u8(b'"');
     }
 
     #[cfg(feature = "inline_int")]
@@ -262,5 +259,129 @@ impl WriteExt for &mut BytesWriter {
     fn put_null(&mut self) {
         debug_assert!(self.cap - self.len > 8);
         self.put_slice(b"null");
+    }
+}
+
+pub(crate) trait WriteFormatter {
+    fn array_open(writer: &mut BytesWriter);
+
+    fn array_close(writer: &mut BytesWriter);
+
+    fn map_open(writer: &mut BytesWriter);
+
+    fn map_key_value_separator(writer: &mut BytesWriter);
+
+    fn map_close(writer: &mut BytesWriter);
+
+    fn item_separator(writer: &mut BytesWriter);
+
+    #[inline]
+    fn reserve_array(writer: &mut BytesWriter, num_items: usize, bytes_per_item: usize) {
+        writer.reserve(OVERALLOCATION + (num_items * (bytes_per_item + writer.indent + 16)));
+    }
+
+    #[inline]
+    fn reserve_map(writer: &mut BytesWriter, num_items: usize, bytes_per_item: usize) {
+        writer.reserve(2 * (OVERALLOCATION + (num_items * (bytes_per_item + writer.indent + 16))));
+    }
+}
+
+#[derive(Clone)]
+pub(crate) struct CompactFormatter;
+
+impl WriteFormatter for CompactFormatter {
+    #[inline]
+    fn array_open(writer: &mut BytesWriter) {
+        debug_assert!(writer.remaining_mut() > 8);
+        writer.put_u8(b'[');
+    }
+
+    #[inline]
+    fn array_close(writer: &mut BytesWriter) {
+        debug_assert!(writer.remaining_mut() > 8);
+        writer.put_u8(b']');
+    }
+
+    #[inline]
+    fn map_open(writer: &mut BytesWriter) {
+        debug_assert!(writer.remaining_mut() > 8);
+        writer.put_u8(b'{');
+    }
+
+    #[inline]
+    fn map_key_value_separator(writer: &mut BytesWriter) {
+        debug_assert!(writer.remaining_mut() > 8);
+        writer.put_u8(b':');
+    }
+
+    #[inline]
+    fn map_close(writer: &mut BytesWriter) {
+        debug_assert!(writer.remaining_mut() > 8);
+        writer.put_u8(b'}');
+    }
+
+    #[inline]
+    fn item_separator(writer: &mut BytesWriter) {
+        debug_assert!(writer.remaining_mut() > 8);
+        writer.put_u8(b',');
+    }
+}
+
+#[derive(Clone)]
+pub(crate) struct IndentFormatter;
+
+impl WriteFormatter for IndentFormatter {
+    #[inline]
+    fn array_open(writer: &mut BytesWriter) {
+        debug_assert!(writer.remaining_mut() > 8);
+        writer.indent();
+        writer.reserve(OVERALLOCATION + writer.indent);
+        writer.put_u8(b'[');
+        writer.put_u8(b'\n');
+        writer.put_indent();
+    }
+
+    #[inline]
+    fn array_close(writer: &mut BytesWriter) {
+        debug_assert!(writer.remaining_mut() > 8);
+        writer.dedent();
+        writer.reserve(OVERALLOCATION + writer.indent);
+        writer.put_u8(b'\n');
+        writer.put_indent();
+        writer.put_u8(b']');
+    }
+
+    #[inline]
+    fn map_open(writer: &mut BytesWriter) {
+        debug_assert!(writer.remaining_mut() > 8);
+        writer.indent();
+        writer.reserve(OVERALLOCATION + writer.indent);
+        writer.put_u8(b'{');
+        writer.put_u8(b'\n');
+        writer.put_indent();
+    }
+
+    #[inline]
+    fn map_key_value_separator(writer: &mut BytesWriter) {
+        debug_assert!(writer.remaining_mut() > 8);
+        writer.put_slice(b": ");
+    }
+
+    #[inline]
+    fn map_close(writer: &mut BytesWriter) {
+        debug_assert!(writer.remaining_mut() > 8);
+        writer.dedent();
+        writer.reserve(OVERALLOCATION + writer.indent);
+        writer.put_u8(b'\n');
+        writer.put_indent();
+        writer.put_u8(b'}');
+    }
+
+    #[inline]
+    fn item_separator(writer: &mut BytesWriter) {
+        debug_assert!(writer.remaining_mut() > 8);
+        writer.reserve(OVERALLOCATION + writer.indent);
+        writer.put_slice(b",\n");
+        writer.put_indent();
     }
 }

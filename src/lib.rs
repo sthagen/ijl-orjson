@@ -3,6 +3,7 @@
 
 #![cfg_attr(feature = "generic_simd", feature(portable_simd))]
 #![cfg_attr(feature = "optimize", feature(optimize_attribute))]
+#![cfg_attr(feature = "trusted_len", feature(trusted_len))]
 #![allow(unused_features)] // portable_simd on universal2 cross-compile
 #![allow(stable_features)]
 #![allow(static_mut_refs)]
@@ -57,16 +58,14 @@ use core::ffi::{c_char, c_int, c_void};
 use core::ptr::{NonNull, null, null_mut};
 
 use crate::deserialize::deserialize;
-use crate::exception::{
-    raise_dumps_exception_dynamic, raise_dumps_exception_fixed, raise_loads_exception,
-};
+use crate::exception::{raise_dumps_exception, raise_loads_exception};
 use crate::ffi::{
     METH_KEYWORDS, METH_O, Py_SIZE, Py_ssize_t, PyCFunction_NewEx, PyIntRef, PyMethodDef,
     PyMethodDefPointer, PyModuleDef, PyModuleDef_HEAD_INIT, PyModuleDef_Init, PyModuleDef_Slot,
     PyNoneRef, PyObject, PyTupleRef, PyUnicode_FromStringAndSize, PyUnicode_InternFromString,
     PyVectorcall_NARGS,
 };
-use crate::serialize::serialize;
+use crate::serialize::{SerializeError, serialize};
 use crate::util::{isize_to_usize, usize_to_isize};
 
 #[cfg(Py_3_13)]
@@ -193,10 +192,20 @@ pub(crate) unsafe extern "C" fn PyInit_orjson() -> *mut PyModuleDef {
                 slot: crate::ffi::Py_mod_multiple_interpreters,
                 value: crate::ffi::Py_MOD_MULTIPLE_INTERPRETERS_NOT_SUPPORTED,
             },
-            #[cfg(Py_3_13)]
+            #[cfg(all(Py_3_13, not(Py_3_14)))]
             PyModuleDef_Slot {
                 slot: crate::ffi::Py_mod_gil,
                 value: crate::ffi::Py_MOD_GIL_USED,
+            },
+            #[cfg(all(not(Py_GIL_DISABLED), Py_3_14))]
+            PyModuleDef_Slot {
+                slot: crate::ffi::Py_mod_gil,
+                value: crate::ffi::Py_MOD_GIL_USED,
+            },
+            #[cfg(all(Py_GIL_DISABLED, Py_3_14))]
+            PyModuleDef_Slot {
+                slot: crate::ffi::Py_mod_gil,
+                value: crate::ffi::Py_MOD_GIL_NOT_USED,
             },
             PyModuleDef_Slot {
                 slot: 0,
@@ -254,15 +263,13 @@ pub(crate) unsafe extern "C" fn dumps(
         let num_args = PyVectorcall_NARGS(isize_to_usize(nargs));
         if num_args == 0 {
             cold_path!();
-            return raise_dumps_exception_fixed(
-                "dumps() missing 1 required positional argument: 'obj'",
-            );
+            return raise_dumps_exception(SerializeError::ArgsMissingPositional);
         }
         if num_args & 2 == 2 {
-            default = Some(NonNull::new_unchecked(*args.offset(1)));
+            default = Some(NonNull::new_unchecked(*args.add(1)));
         }
         if num_args & 3 == 3 {
-            optsptr = Some(NonNull::new_unchecked(*args.offset(2)));
+            optsptr = Some(NonNull::new_unchecked(*args.add(2)));
         }
         if !kwnames.is_null() {
             cold_path!();
@@ -272,23 +279,17 @@ pub(crate) unsafe extern "C" fn dumps(
                 if matches_kwarg!(arg, typeref::OPTION) {
                     if num_args & 3 == 3 {
                         cold_path!();
-                        return raise_dumps_exception_fixed(
-                            "dumps() got multiple values for argument: 'option'",
-                        );
+                        return raise_dumps_exception(SerializeError::ArgsMultipleOption);
                     }
                     optsptr = Some(NonNull::new_unchecked(*args.offset(num_args + i)));
                 } else if matches_kwarg!(arg, typeref::DEFAULT) {
                     if num_args & 2 == 2 {
                         cold_path!();
-                        return raise_dumps_exception_fixed(
-                            "dumps() got multiple values for argument: 'default'",
-                        );
+                        return raise_dumps_exception(SerializeError::ArgsMultipleDefault);
                     }
                     default = Some(NonNull::new_unchecked(*args.offset(num_args + i)));
                 } else {
-                    return raise_dumps_exception_fixed(
-                        "dumps() got an unexpected keyword argument",
-                    );
+                    return raise_dumps_exception(SerializeError::ArgsUnexpectedKeyword);
                 }
             }
         }
@@ -302,21 +303,18 @@ pub(crate) unsafe extern "C" fn dumps(
                         opts = opt;
                     }
                     Err(_) => {
-                        return raise_dumps_exception_fixed("Invalid opts");
+                        return raise_dumps_exception(SerializeError::ArgsInvalidOpts);
                     }
                 },
                 Err(_) => {
                     if !core::ptr::eq(tmp.as_ptr(), PyNoneRef::none().as_ptr()) {
                         cold_path!();
-                        return raise_dumps_exception_fixed("Invalid opts");
+                        return raise_dumps_exception(SerializeError::ArgsInvalidOpts);
                     }
                 }
             }
         }
 
-        serialize(*args, default, opts).map_or_else(
-            |err| raise_dumps_exception_dynamic(err.as_str()),
-            NonNull::as_ptr,
-        )
+        serialize(*args, default, opts).map_or_else(raise_dumps_exception, NonNull::as_ptr)
     }
 }

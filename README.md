@@ -23,8 +23,8 @@ not provided by the library.
 
 orjson supports CPython 3.10, 3.11, 3.12, 3.13, 3.14, and 3.15.
 
-It distributes amd64/x86_64/x64, i686/x86, aarch64/arm64/armv8, arm7,
-ppc64le/POWER8, and s390x wheels for Linux, amd64 and aarch64 wheels
+It distributes amd64/x86_64/x64, i686/x86, aarch64/arm64/armv8, and armv7 wheels
+for Linux, amd64 and aarch64 wheels
 for macOS, and amd64, i686, and aarch64 wheels for Windows.
 
 Wheels published to PyPI for amd64 run on x86-64-v1 (2003)
@@ -1077,17 +1077,18 @@ The recommended build command is:
 maturin build --release --strip
 ```
 
-The project's own CI tests against `nightly-2026-05-01` and stable 1.95. It
+The project's own CI tests against `nightly-2026-08-01` and stable 1.95. It
 is prudent to pin the nightly version because that channel can introduce
 breaking changes. There is a significant performance benefit to using
 nightly.
 
-orjson is tested on native hardware for amd64, aarch64, and i686 on Linux. It is
-cross-compiled and may be tested via emulation for arm7, ppc64le, and s390x. It
-is tested for aarch64 on macOS and cross-compiles for amd64. For
-Windows it is tested on amd64, i686, and aarch64.
+orjson is tested, on Linux, using native hardware for amd64 and aarch64,
+aarch64 to run an armv7 container, amd64 to run an i686 container; on macOS,
+native hardware for aarch64 and a cross-compilation for amd64; on Windows,
+native hardware for amd64 and aarch64, and amd64 for i686.
 
-There are no runtime dependencies other than libc.
+The library does not require any other host-level or Python package to be
+installed.
 
 The source distribution on PyPI contains all dependencies' source and can be
 built without network access. The file can be downloaded from

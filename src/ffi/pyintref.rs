@@ -229,7 +229,9 @@ impl PyIntRef {
         let ival = unsafe { crate::ffi::PyLong_AsLongLong(self.as_ptr()) };
         if ival == -1 && unsafe { !crate::ffi::PyErr_Occurred().is_null() } {
             cold_path!();
-            unsafe { crate::ffi::PyErr_Clear() };
+            unsafe {
+                crate::ffi::PyErr_Clear();
+            }
             Err(PyIntError::NotSigned)
         } else {
             Ok(ival)

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MPL-2.0
-# Copyright ijl (2025)
+# Copyright ijl (2025-2026)
 
 import sys
 from pathlib import Path
@@ -14,51 +14,76 @@ pyproject_version = pyproject_doc["project"]["version"]
 
 prefix = f"orjson-{pyproject_version}"
 
-abis = (
+MANYLINUX_2_17 = [
+    "manylinux2014_armv7l.manylinux_2_17_armv7l",
+    "manylinux2014_i686.manylinux_2_17_i686",
+    "manylinux_2_17_aarch64.manylinux2014_aarch64",
+    "manylinux_2_17_x86_64.manylinux2014_x86_64",
+]
+
+MANYLINUX_2_39 = [
+    "manylinux_2_39_aarch64",
+    "manylinux_2_39_armv7l",
+    "manylinux_2_39_i686",
+    "manylinux_2_39_x86_64",
+]
+
+MACOS_ARM64 = [
+    "macosx_15_0_arm64",
+]
+
+WIN_ARM64 = [
+    "win_arm64",
+]
+
+MACOS_UNIVERSAL2 = [
+    "macosx_10_15_x86_64.macosx_11_0_arm64.macosx_10_15_universal2",
+]
+
+MUSLLINUX = [
+    "musllinux_1_2_aarch64",
+    "musllinux_1_2_x86_64",
+]
+
+WIN_AMD64_I686 = [
+    "win32",
+    "win_amd64",
+]
+
+ABIS = (
     "cp310-cp310",
     "cp311-cp311",
     "cp312-cp312",
     "cp313-cp313",
     "cp314-cp314",
+    "cp315-cp315",
 )
 
-per_abi_tags = (
-    "macosx_10_15_x86_64.macosx_11_0_arm64.macosx_10_15_universal2",
-    "manylinux_2_17_aarch64.manylinux2014_aarch64",
-    "manylinux_2_17_armv7l.manylinux2014_armv7l",
-    "manylinux_2_17_ppc64le.manylinux2014_ppc64le",
-    "manylinux_2_17_s390x.manylinux2014_s390x",
-    "manylinux_2_17_x86_64.manylinux2014_x86_64",
-    "manylinux_2_17_i686.manylinux2014_i686",
-    "musllinux_1_2_aarch64",
-    "musllinux_1_2_armv7l",
-    "musllinux_1_2_i686",
-    "musllinux_1_2_x86_64",
-    "win32",
-    "win_amd64",
-)
 
 wheels_matrix = set()
 
-# orjson-3.10.15-cp310-cp310-macosx_10_15_x86_64.macosx_11_0_arm64.macosx_10_15_universal2.whl
-for abi in abis:
-    for tag in per_abi_tags:
+for abi in ABIS:
+    tags = []
+    tags.extend(MACOS_UNIVERSAL2)
+    tags.extend(MUSLLINUX)
+    tags.extend(WIN_AMD64_I686)
+
+    if abi > "cp310-cp310":
+        tags.extend(MACOS_ARM64)
+        tags.extend(WIN_ARM64)
+
+    if abi < "cp315-cp315":
+        tags.extend(MANYLINUX_2_17)
+    else:
+        tags.extend(MANYLINUX_2_39)
+
+    for tag in tags:
+        # orjson-3.10.15-cp310-cp310-macosx_10_15_x86_64.macosx_11_0_arm64.macosx_10_15_universal2.whl
         wheels_matrix.add(f"{prefix}-{abi}-{tag}.whl")
 
-wheels_prerelease = set()
+wheels_unique = set()
 
-wheels_unique = {
-    f"{prefix}-cp311-cp311-macosx_15_0_arm64.whl",
-    f"{prefix}-cp311-cp311-win_arm64.whl",
-    f"{prefix}-cp312-cp312-macosx_15_0_arm64.whl",
-    f"{prefix}-cp312-cp312-win_arm64.whl",
-    f"{prefix}-cp313-cp313-macosx_15_0_arm64.whl",
-    f"{prefix}-cp313-cp313-win_arm64.whl",
-    f"{prefix}-cp314-cp314-macosx_15_0_arm64.whl",
-    f"{prefix}-cp314-cp314-win_arm64.whl",
-}
-
-wheels_expected = wheels_matrix | wheels_unique | wheels_prerelease
+wheels_expected = wheels_matrix | wheels_unique
 
 wheels_queued = set(
     str(each).replace(f"{dist}/", "") for each in Path(dist).glob("*.whl")

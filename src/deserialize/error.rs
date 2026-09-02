@@ -11,7 +11,7 @@ pub(crate) struct DeserializeError<'a> {
 
 impl<'a> DeserializeError<'a> {
     #[cold]
-    pub fn invalid(message: Cow<'a, str>) -> Self {
+    pub const fn invalid(message: Cow<'a, str>) -> Self {
         DeserializeError {
             message: message,
             data: None,

@@ -5,8 +5,8 @@ mod array;
 mod datetime;
 mod item;
 mod scalar;
+mod typeref;
 
-pub(crate) use array::*;
-pub(crate) use datetime::*;
-pub(crate) use item::*;
-pub(crate) use scalar::*;
+pub(crate) use array::{NumpyArray, PyArrayError};
+pub(crate) use scalar::NumpyScalar;
+pub(crate) use typeref::{is_numpy_array, is_numpy_scalar};

@@ -1,10 +1,11 @@
-// SPDX-License-Identifier: (Apache-2.0 OR MIT)
-// Copyright ijl (2020-2026), Jack Amadeo (2023)
+// SPDX-License-Identifier: MPL-2.0
+// Copyright ijl (2020-2026)
 
 use core::ptr::null_mut;
 
 use crate::deserialize::DeserializeError;
 use crate::ffi::{Py_DECREF, PyErr_SetObject, PyIntRef, PyObject, PyStrRef, PyTupleRef};
+use crate::serialize::SerializeError;
 use crate::typeref::{JsonDecodeError, JsonEncodeError};
 
 #[cold]
@@ -30,27 +31,18 @@ pub(crate) fn raise_loads_exception(err: DeserializeError) -> *mut PyObject {
 
 #[cold]
 #[inline(never)]
-#[cfg_attr(feature = "optimize", optimize(size))]
-pub(crate) fn raise_dumps_exception_fixed(msg: &str) -> *mut PyObject {
-    unsafe {
-        let err_msg = PyStrRef::from_str(msg);
-        PyErr_SetObject(JsonEncodeError, err_msg.as_ptr());
-        Py_DECREF(err_msg.as_ptr());
-    }
-    null_mut()
-}
-
-#[cold]
-#[inline(never)]
-#[cfg_attr(feature = "optimize", optimize(size))]
 #[cfg(Py_3_12)]
-pub(crate) fn raise_dumps_exception_dynamic(err: &str) -> *mut PyObject {
+#[cfg_attr(feature = "optimize", optimize(size))]
+pub(crate) fn raise_dumps_exception(err: SerializeError) -> *mut PyObject {
     unsafe {
-        let cause_exc: *mut PyObject = crate::ffi::PyErr_GetRaisedException();
-
-        let err_msg = PyStrRef::from_str(err);
-        PyErr_SetObject(JsonEncodeError, err_msg.as_ptr());
-        Py_DECREF(err_msg.as_ptr());
+        let cause_exc: *mut PyObject = if err.may_have_cause() {
+            crate::ffi::PyErr_GetRaisedException()
+        } else {
+            null_mut()
+        };
+        let err_msg = err.to_pyunicode().as_ptr();
+        PyErr_SetObject(JsonEncodeError, err_msg);
+        Py_DECREF(err_msg);
 
         if !cause_exc.is_null() {
             let exc: *mut PyObject = crate::ffi::PyErr_GetRaisedException();
@@ -63,18 +55,21 @@ pub(crate) fn raise_dumps_exception_dynamic(err: &str) -> *mut PyObject {
 
 #[cold]
 #[inline(never)]
-#[cfg_attr(feature = "optimize", optimize(size))]
 #[cfg(not(Py_3_12))]
-pub(crate) fn raise_dumps_exception_dynamic(err: &str) -> *mut PyObject {
+#[cfg_attr(feature = "optimize", optimize(size))]
+pub(crate) fn raise_dumps_exception(err: SerializeError) -> *mut PyObject {
     unsafe {
+        let may_have_cause = err.may_have_cause();
         let mut cause_tp: *mut PyObject = null_mut();
         let mut cause_val: *mut PyObject = null_mut();
         let mut cause_traceback: *mut PyObject = null_mut();
-        crate::ffi::PyErr_Fetch(&mut cause_tp, &mut cause_val, &mut cause_traceback);
 
-        let err_msg = PyStrRef::from_str(err);
-        PyErr_SetObject(JsonEncodeError, err_msg.as_ptr());
-        Py_DECREF(err_msg.as_ptr());
+        if may_have_cause {
+            crate::ffi::PyErr_Fetch(&mut cause_tp, &mut cause_val, &mut cause_traceback);
+        }
+        let err_msg = err.to_pyunicode().as_ptr();
+        PyErr_SetObject(JsonEncodeError, err_msg);
+        Py_DECREF(err_msg);
 
         let mut tp: *mut PyObject = null_mut();
         let mut val: *mut PyObject = null_mut();
@@ -82,17 +77,19 @@ pub(crate) fn raise_dumps_exception_dynamic(err: &str) -> *mut PyObject {
         crate::ffi::PyErr_Fetch(&mut tp, &mut val, &mut traceback);
         crate::ffi::PyErr_NormalizeException(&mut tp, &mut val, &mut traceback);
 
-        if !cause_tp.is_null() {
-            crate::ffi::PyErr_NormalizeException(
-                &mut cause_tp,
-                &mut cause_val,
-                &mut cause_traceback,
-            );
-            crate::ffi::PyException_SetCause(val, cause_val);
-            Py_DECREF(cause_tp);
-        }
-        if !cause_traceback.is_null() {
-            Py_DECREF(cause_traceback);
+        if may_have_cause {
+            if !cause_tp.is_null() {
+                crate::ffi::PyErr_NormalizeException(
+                    &mut cause_tp,
+                    &mut cause_val,
+                    &mut cause_traceback,
+                );
+                crate::ffi::PyException_SetCause(val, cause_val);
+                Py_DECREF(cause_tp);
+            }
+            if !cause_traceback.is_null() {
+                Py_DECREF(cause_traceback);
+            }
         }
 
         crate::ffi::PyErr_Restore(tp, val, traceback);
